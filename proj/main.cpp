@@ -1,16 +1,9 @@
-// Lab 1-1, multi-pass rendering with FBOs and HDR.
-// Revision for 2013, simpler light, start with rendering on quad in final stage.
-// Switched to low-res Stanford Bunny for more details.
-// No HDR is implemented to begin with. That is your task.
-
-// 2018: No zpr, trackball code added in the main program.
-// 2021: Updated to use LittleOBJLoader.
-// 2022: Cleaned up. Made C++ variant.
-
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
 #include <iostream>
+#include <vector>
+#include <cstdlib>
 #include "MicroGlut.h"
 #define MAIN
 #include "VectorUtils4.h"
@@ -24,6 +17,67 @@
 #define H 512
 
 #define NUM_LIGHTS 4
+
+vec3 sphere_to_rect(float theta, float phi, float r, vec3 start) {
+    float x_end = r * sin(theta) * cos(phi);
+    float y_end = r * sin(theta) * sin(phi);
+    float z_end = r * cos(theta);
+    return {start.x + x_end, start.y + y_end, start.z + z_end};
+}
+
+vec3 rand_start() {
+    return {float(std::rand() % 100), 20.0, float(std::rand() % 100)};
+}
+
+float find_angle(vec3 v1, vec3 v2) {
+    float dotprod = dot(v1, v2);
+    float l1 = Norm(v1);
+    float l2 = Norm(v2);
+    float angl = acos(dotprod / (l1 * l2));
+    return angl;
+}
+
+struct lightning_seg {
+    vec3 start;
+    vec3 end;
+    float width;
+    struct lightning_seg *parent;
+    std::vector<struct lightning_seg*> children;
+    std::vector<vec3> lights;
+};
+
+void generate_lightning(vec3 start, vec3 end, lightning_seg *lightning) {
+    lightning->start = start;
+    float length_r = (std::rand() % 100) / 10.0;
+    if (length_r >= Norm(end - start)) {
+        lightning->end = end;
+        return;
+    }
+    float angle = 0.0;
+    while(angle > Norm(end - start)) { //TODO: adjust distance dependency
+        float angle_theta = (std::rand() % 60 - 30) * M_PI / 180.0;
+        float angle_phi = (std::rand() % 60 - 30) * M_PI / 180.0;
+        vec3 seg_end = sphere_to_rect(angle_theta, angle_phi, length_r, start);
+        lightning->end = seg_end;
+        angle = find_angle(end - start, seg_end - start);
+    }
+
+    lightning_seg* main_child = new lightning_seg;
+    main_child->width = lightning->width * 0.99;
+    main_child->parent = lightning;
+
+    generate_lightning(lightning->end, end, main_child);
+    if(std::rand() % 100 < 20.0 * (Norm(end - lightning->end))) { // TODO: adjust distance dependency
+        lightning_seg* secondary_child = new lightning_seg;
+        secondary_child->width = lightning->width * 0.95;
+        secondary_child->parent = lightning;
+        float end_r = (std::rand() % 300) / 10.0;
+        float end_theta = (std::rand() % 60 - 30) * M_PI / 180.0;
+        float end_phi = (std::rand() % 60 - 30) * M_PI / 180.0;
+
+        generate_lightning(lightning->end, sphere_to_rect(end_theta, end_phi, end_r, lightning->end), secondary_child);
+    }
+}
 
 mat4 projectionMatrix;
 mat4 viewMatrix, modelToWorldMatrix;
