@@ -38,6 +38,7 @@ float find_angle(vec3 v1, vec3 v2) {
 }
 
 struct lightning_seg {
+    int no;
     vec3 start;
     vec3 end;
     float width;
@@ -46,37 +47,72 @@ struct lightning_seg {
     std::vector<vec3> lights;
 };
 
-void generate_lightning(vec3 start, vec3 end, lightning_seg *lightning) {
+float get_theta(vec3 v) {
+    return acos(v.z / Norm(v));
+}
+
+float get_phi(vec3 v) {
+    if(v.y < 0)
+        return -acos(v.x / sqrt(v.x * v.x + v.y * v.y));
+    return acos(v.x / sqrt(v.x * v.x + v.y * v.y));
+}
+
+void generate_lightning(vec3 start, vec3 end, lightning_seg *lightning, vec3 tot_start) {
+    std::cout << "bolt seg: " << lightning->no << std::endl;
     lightning->start = start;
     float length_r = (std::rand() % 100) / 10.0;
+    std::cout << "bolt len: " << length_r << std::endl;
     if (length_r >= Norm(end - start)) {
         lightning->end = end;
         return;
     }
-    float angle = 0.0;
-    while(angle > Norm(end - start)) { //TODO: adjust distance dependency
-        float angle_theta = (std::rand() % 60 - 30) * M_PI / 180.0;
-        float angle_phi = (std::rand() % 60 - 30) * M_PI / 180.0;
-        vec3 seg_end = sphere_to_rect(angle_theta, angle_phi, length_r, start);
-        lightning->end = seg_end;
-        angle = find_angle(end - start, seg_end - start);
-    }
+
+    float end_theta = get_theta(end - start);
+    float end_phi = get_phi(end - start);
+
+    float progress = Norm(end - start) / Norm(end - tot_start);
+
+    float angle_theta = end_theta + progress * ((std::rand() % 60 - 30) * M_PI / 180.0);
+    std::cout << "bolt theta: " << angle_theta << std::endl;
+    float angle_phi = end_phi + progress * ((std::rand() % 60 - 30) * M_PI / 180.0);
+    std::cout << "bolt phi: " << angle_phi << std::endl;
+    vec3 seg_end = sphere_to_rect(angle_theta, angle_phi, length_r, start);
+    lightning->end = seg_end;
 
     lightning_seg* main_child = new lightning_seg;
     main_child->width = lightning->width * 0.99;
     main_child->parent = lightning;
+    main_child->no = lightning->no + 1;
 
-    generate_lightning(lightning->end, end, main_child);
-    if(std::rand() % 100 < 20.0 * (Norm(end - lightning->end))) { // TODO: adjust distance dependency
-        lightning_seg* secondary_child = new lightning_seg;
-        secondary_child->width = lightning->width * 0.95;
-        secondary_child->parent = lightning;
-        float end_r = (std::rand() % 300) / 10.0;
-        float end_theta = (std::rand() % 60 - 30) * M_PI / 180.0;
-        float end_phi = (std::rand() % 60 - 30) * M_PI / 180.0;
+    generate_lightning(lightning->end, end, main_child, tot_start);
+    // if(std::rand() % 100 < 20.0 * (Norm(end - lightning->end))) { // TODO: adjust distance dependency
+    //     lightning_seg* secondary_child = new lightning_seg;
+    //     secondary_child->width = lightning->width * 0.95;
+    //     secondary_child->parent = lightning;
+    //     float end_r = (std::rand() % 300) / 10.0;
+    //     float end_theta = (std::rand() % 60 - 30) * M_PI / 180.0;
+    //     float end_phi = (std::rand() % 60 - 30) * M_PI / 180.0;
 
-        generate_lightning(lightning->end, sphere_to_rect(end_theta, end_phi, end_r, lightning->end), secondary_child);
+    //     generate_lightning(lightning->end, sphere_to_rect(end_theta, end_phi, end_r, lightning->end), secondary_child);
+    // }
+}
+
+void delete_lightning(lightning_seg *l) {
+    if(!l->children.empty()) {
+        for(auto c : l->children) {
+            delete_lightning(c);
+        }
     }
+    delete l;
+    return;
+}
+
+void draw_seg(lightning_seg *l) {
+    float ver[3][3] = { // start with polygon
+        {l->start.x, l->start.y, l->start.z},
+        {l->start.x + l->width, l->start.y, l->start.z},
+        {l->end.x, l->end.y, l->end.z}
+    };
 }
 
 mat4 projectionMatrix;
@@ -124,6 +160,14 @@ void runfilter(GLuint shader, FBOstruct *in1, FBOstruct *in2, FBOstruct *out)
 
 void init(void)
 {
+    lightning_seg *sl = new lightning_seg;
+    sl->no = 0;
+
+    vec3 start = rand_start();
+    vec3 end = start;
+    end.y = 0.0;
+    generate_lightning(start, end, sl, start);
+
 	dumpInfo();  // shader info
 
 	// GL inits
