@@ -103,14 +103,25 @@ void delete_lightning(lightning_seg *l) {
     return;
 }
 
-void draw_seg(lightning_seg *l) {
+Model* segModel;
+
+void init_seg(lightning_seg *l) {
+    float scale = 0.05;
     GLfloat ver[3][3] = { // start with polygon
-        {(GLfloat)l->start.x, (GLfloat)l->start.y, (GLfloat)l->start.z},
-        {(GLfloat)l->start.x + l->width, (GLfloat)l->start.y, (GLfloat)l->start.z},
-        {(GLfloat)l->end.x, (GLfloat)l->end.y, (GLfloat)l->end.z}
+        {(GLfloat)l->end.x * scale, (GLfloat)l->end.y * scale, (GLfloat)l->end.z * scale},
+        {(GLfloat)(l->start.x + l->width) * scale, (GLfloat)l->start.y * scale, (GLfloat)l->start.z * scale},
+        {(GLfloat)l->start.x * scale, (GLfloat)l->start.y * scale, (GLfloat)l->start.z * scale}
+        // {0.0, -1.0, 0.0},
+        // {1.0, 0.0, 0.0},
+        // {0.0, 0.0, 0.0}
     };
-    glBufferData(GL_ARRAY_BUFFER, 9*sizeof(GLfloat), ver, GL_STATIC_DRAW);
-    glDrawArrays(GL_TRIANGLES, 0 , 3);
+    std::cout << "trying to write: {" << l->end.x * scale << ", " << l->end.y * scale << ", " << l->end.z * scale << "}" << std::endl;
+    std::cout << "{" << (l->start.x + l->width) * scale << ", " << l->start.y * scale << ", " << l->start.z * scale << "}" << std::endl;
+    std::cout << "{" << l->start.x * scale << ", " << l->start.y * scale << ", " << l->start.z * scale << "}" << std::endl;
+    GLuint ind[] = {0,1,2};
+	segModel = LoadDataToModel(
+			(vec3 *)ver, NULL, NULL, NULL,
+			ind, 3, 3);
 }
 
 mat4 projectionMatrix;
@@ -161,10 +172,12 @@ void init(void)
     std::cout << "start" << std::endl;
     sl->no = 0;
     sl->width = 3;
-    vec3 st = rand_start();
+    vec3 st = {0.0, 10.0, 10.0};// rand_start();
     vec3 en = st;
-    en.y += 10;
+    en.y -= 10;
     generate_lightning(st, en, sl, st);
+
+    init_seg(sl);
 
 	dumpInfo();  // shader info
 
@@ -238,7 +251,7 @@ void display(void)
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
 
-	DrawModel(model1, phongshader, "in_Position", "in_Normal", NULL);
+	DrawModel(segModel, phongshader, "in_Position", "in_Normal", NULL);
 
 	runfilter(truncateshader, fbo3, 0L, fbo2);
 
