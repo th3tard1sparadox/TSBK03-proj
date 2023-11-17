@@ -10,9 +10,10 @@ uniform mat4 projectionMatrix;
 
 void main(void)
 {
-	exNormal = inverse(transpose(mat3(modelviewMatrix))) * in_Normal; // Phong, "fake" normal transformation
+	// exNormal = inverse(transpose(mat3(modelviewMatrix))) * in_Normal; // Phong, "fake" normal transformation
 
-	exSurface = vec3(modelviewMatrix * vec4(in_Position, 1.0)); // Don't include projection here - we only want to go to view coordinates
+	// exSurface = vec3(modelviewMatrix * vec4(in_Position, 1.0)); // Don't include projection here - we only want to go to view coordinates
 
-	gl_Position = projectionMatrix * modelviewMatrix * vec4(in_Position, 1.0); // This should include projection
+	// gl_Position = projectionMatrix * modelviewMatrix * vec4(in_Position, 1.0); // This should include projection
+    gl_Position = vec4(in_Position, 1.0);
 }
