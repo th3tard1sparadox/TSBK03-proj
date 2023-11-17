@@ -28,7 +28,7 @@ struct lightning_seg {
     std::vector<vec3> lights;
 };
 
-lightning_seg *sl;
+lightning_seg *sl = new lightning_seg;
 
 vec3 sphere_to_rect(float theta, float phi, float r, vec3 start) {
     float x_end = r * sin(theta) * cos(phi);
@@ -158,6 +158,7 @@ void runfilter(GLuint shader, FBOstruct *in1, FBOstruct *in2, FBOstruct *out)
 
 void init(void)
 {
+    std::cout << "start" << std::endl;
     sl->no = 0;
     sl->width = 3;
     vec3 st = rand_start();
