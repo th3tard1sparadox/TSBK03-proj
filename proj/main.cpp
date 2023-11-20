@@ -19,13 +19,14 @@
 #define NUM_LIGHTS 4
 
 struct lightning_seg {
-    int no;
+    int bd;
     vec3 start;
     vec3 end;
     float width;
     struct lightning_seg *parent;
     std::vector<struct lightning_seg*> children;
     std::vector<vec3> lights;
+	Model *m;
 };
 
 lightning_seg *sl = new lightning_seg;
@@ -51,13 +52,49 @@ float get_phi(vec3 v) {
     return acos(v.x / sqrt(v.x * v.x + v.y * v.y));
 }
 
+Model* gen_seg_model(lightning_seg *l) {
+    float scale = 1.00;
+
+	// for printing
+	float v0x = (GLfloat)(l->start.x + l->width * cos(0)) * scale;
+	float v0y = (GLfloat)l->start.y * scale;
+	float v0z = (GLfloat)(l->start.z + l->width * sin(0)) * scale; // 0
+	float v1x = (GLfloat)(l->start.x + l->width * cos(2*M_PI/3)) * scale;
+	float v1y = (GLfloat)l->start.y * scale;
+	float v1z = (GLfloat)(l->start.z + l->width * sin(2*M_PI/3)) * scale; // 1
+	float v2x = (GLfloat)(l->start.x + l->width * cos(4*M_PI/3)) * scale;
+	float v2y = (GLfloat)l->start.y * scale;
+	float v2z = (GLfloat)(l->start.z + l->width * sin(4*M_PI/3)) * scale; // 2
+	float v3x = (GLfloat)l->end.x * scale;
+	float v3y = (GLfloat)l->end.y * scale;
+	float v3z = (GLfloat)l->end.z * scale; // 3
+
+	GLfloat ver[] = {
+		(GLfloat)(l->start.x + l->width * cos(0)) * scale, (GLfloat)l->start.y * scale, (GLfloat)(l->start.z + l->width * sin(0)) * scale, // 0
+		(GLfloat)(l->start.x + l->width * cos(2*M_PI/3)) * scale, (GLfloat)l->start.y * scale, (GLfloat)(l->start.z + l->width * sin(2*M_PI/3)) * scale, // 1
+		(GLfloat)(l->start.x + l->width * cos(4*M_PI/3)) * scale, (GLfloat)l->start.y * scale, (GLfloat)(l->start.z + l->width * sin(4*M_PI/3)) * scale, // 2
+		(GLfloat)l->end.x * scale, (GLfloat)l->end.y * scale, (GLfloat)l->end.z * scale // 3
+	};
+
+	// std::cout << "first triangle: {{" << v3x << "," << v3y << "," << v3z << "},{" << v0x << "," << v0y << "," << v0z <<  "},{" << v2x << "," << v2y << "," << v2z <<  "}}" << std::endl;
+	// std::cout << "second triangle: {{" << v3x << "," << v3y << "," << v3z << "},{" << v2x << "," << v2y << "," << v2z <<  "},{" << v1x << "," << v1y << "," << v1z <<  "}}" << std::endl;
+	// std::cout << "third triangle: {{" << v3x << "," << v3y << "," << v3z << "},{" << v1x << "," << v1y << "," << v1z <<  "},{" << v0x << "," << v0y << "," << v0z <<  "}}" << std::endl;
+
+    GLuint ind[] = {3,0,2,3,2,1,3,1,0};
+	return LoadDataToModel(
+			(vec3 *)ver, NULL, NULL, NULL,
+			ind, 4, 9);
+}
+
+
 void generate_lightning(vec3 start, vec3 end, lightning_seg *lightning, vec3 tot_start) {
-    std::cout << "bolt seg: " << lightning->no << std::endl;
+    //std::cout << "bolt depth: " << lightning->bd << std::endl;
     lightning->start = start;
-    float length_r = (std::rand() % 1000) / 200.0;
-    std::cout << "bolt len: " << length_r << std::endl;
+    float length_r = (std::rand() % 2000) / 4000.0 + 0.5;
+    //std::cout << "bolt len: " << length_r << std::endl;
     if (length_r >= Norm(end - start)) {
         lightning->end = end;
+		lightning->m = gen_seg_model(lightning);
         return;
     }
 
@@ -66,30 +103,34 @@ void generate_lightning(vec3 start, vec3 end, lightning_seg *lightning, vec3 tot
 
     float progress = Norm(end - start) / Norm(end - tot_start);
 
-    float angle_theta = end_theta + progress * ((std::rand() % 60 - 30) * M_PI / 180.0);
-    std::cout << "bolt theta: " << angle_theta << std::endl;
-    float angle_phi = end_phi + progress * ((std::rand() % 60 - 30) * M_PI / 180.0);
-    std::cout << "bolt phi: " << angle_phi << std::endl;
+    float angle_theta = end_theta + (1 - (1-progress) * (1-progress)) * ((std::rand() % 160 - 80) * M_PI / 180.0);
+    //std::cout << "bolt theta: " << angle_theta << std::endl;
+    float angle_phi = end_phi + (1 - (1-progress) * (1-progress)) * ((std::rand() % 160 - 80) * M_PI / 180.0);
+    //std::cout << "bolt phi: " << angle_phi << std::endl;
     vec3 seg_end = sphere_to_rect(angle_theta, angle_phi, length_r, start);
     lightning->end = seg_end;
 
+	lightning->m = gen_seg_model(lightning);
+
     lightning_seg* main_child = new lightning_seg;
-    main_child->width = lightning->width * 0.99;
+    main_child->width = lightning->width * 0.90;
     main_child->parent = lightning;
-    main_child->no = lightning->no + 1;
+    main_child->bd = lightning->bd;
 
     generate_lightning(lightning->end, end, main_child, tot_start);
-    if(std::rand() % 100 < 20.0 * progress) { // TODO: fix where the end points of the bolts generate
+	lightning->children.push_back(main_child);
+    if(std::rand() % 100 < 30.0 * progress) { // TODO: fix where the end points of the bolts generate
         lightning_seg* secondary_child = new lightning_seg;
-        secondary_child->width = lightning->width * 0.95;
+        secondary_child->width = lightning->width * 0.50;
         secondary_child->parent = lightning;
-        secondary_child->no = lightning->no + 1;
-        float end_r = (std::rand() % 300) / 10.0;
-        float child_theta = (std::rand() % 60 - 30) * M_PI / 180.0;
-        float child_phi = (std::rand() % 60 - 30) * M_PI / 180.0;
-        std::cout << "new child at bolt " << lightning->no << " with r = " << end_r << ", theta = " << end_theta << ", phi = " << end_phi << std::endl;
+        secondary_child->bd = lightning->bd + 1;
+        float child_end_r = (std::rand() % 7000) / 1000.0 * exp(-secondary_child->bd);
+        float child_theta = end_theta + (std::rand() % 100 - 50) * M_PI / 180.0;
+        float child_phi = end_phi + (std::rand() % 100 - 50) * M_PI / 180.0;
+        std::cout << "new child at depth " << lightning->bd << " with r = " << child_end_r << ", theta = " << child_theta << ", phi = " << child_phi << std::endl;
 
-        generate_lightning(lightning->end, sphere_to_rect(end_theta, end_phi, end_r, lightning->end), secondary_child, tot_start);
+        generate_lightning(lightning->end, sphere_to_rect(child_theta, child_phi, child_end_r, lightning->end), secondary_child, tot_start);
+		lightning->children.push_back(secondary_child);
     }
 }
 
@@ -101,27 +142,6 @@ void delete_lightning(lightning_seg *l) {
     }
     delete l;
     return;
-}
-
-Model* segModel;
-
-void init_seg(lightning_seg *l) {
-    float scale = 0.05;
-    GLfloat ver[3][3] = { // start with polygon
-        {(GLfloat)l->end.x * scale, (GLfloat)l->end.y * scale, (GLfloat)l->end.z * scale},
-        {(GLfloat)(l->start.x + l->width) * scale, (GLfloat)l->start.y * scale, (GLfloat)l->start.z * scale},
-        {(GLfloat)l->start.x * scale, (GLfloat)l->start.y * scale, (GLfloat)l->start.z * scale}
-        // {0.0, -1.0, 0.0},
-        // {1.0, 0.0, 0.0},
-        // {0.0, 0.0, 0.0}
-    };
-    std::cout << "trying to write: {" << l->end.x * scale << ", " << l->end.y * scale << ", " << l->end.z * scale << "}" << std::endl;
-    std::cout << "{" << (l->start.x + l->width) * scale << ", " << l->start.y * scale << ", " << l->start.z * scale << "}" << std::endl;
-    std::cout << "{" << l->start.x * scale << ", " << l->start.y * scale << ", " << l->start.z * scale << "}" << std::endl;
-    GLuint ind[] = {0,1,2};
-	segModel = LoadDataToModel(
-			(vec3 *)ver, NULL, NULL, NULL,
-			ind, 3, 3);
 }
 
 mat4 projectionMatrix;
@@ -165,19 +185,31 @@ void runfilter(GLuint shader, FBOstruct *in1, FBOstruct *in2, FBOstruct *out)
     glFlush();
 }
 
+void draw_bolt(lightning_seg *start) {
+	DrawModel(start->m, phongshader, "in_Position", "in_Normal", NULL);
+	for(auto child : start->children) {
+		draw_bolt(child);
+	}
+}
+
 //-------------------------------------------------------------------------------------
 
 void init(void)
 {
+	std::cout << "enter seed: ";
+	int seed;
+	std::cin >> seed;
+	std::srand(seed);
+
     std::cout << "start" << std::endl;
-    sl->no = 0;
-    sl->width = 3;
-    vec3 st = {0.0, 10.0, 10.0};// rand_start();
+    sl->bd = 0;
+    sl->width = 0.25;
+    vec3 st = {0.0, 5.0, 0.0};// rand_start();
     vec3 en = st;
-    en.y -= 10;
+    en.y = -5;
     generate_lightning(st, en, sl, st);
 
-    init_seg(sl);
+    //init_seg(sl);
 
 	dumpInfo();  // shader info
 
@@ -208,8 +240,8 @@ void init(void)
 			(vec3 *)square, NULL, (vec2 *)squareTexCoord, NULL,
 			squareIndices, 4, 6);
 
-	vec3 cam = vec3(0, 5, 15);
-	vec3 point = vec3(0, 1, 0);
+	vec3 cam = vec3(0, 0, 500);
+	vec3 point = vec3(0, 0, 0);
 	vec3 up = vec3(0, 1, 0);
 	viewMatrix = lookAtv(cam, point, up);
 	modelToWorldMatrix = IdentityMatrix();
@@ -246,12 +278,13 @@ void display(void)
 	glUniform1i(glGetUniformLocation(phongshader, "texUnit"), 0);
 
 	// Enable Z-buffering
-	glEnable(GL_DEPTH_TEST);
+	//glEnable(GL_DEPTH_TEST);
 	// Enable backface culling
-	glEnable(GL_CULL_FACE);
-	glCullFace(GL_BACK);
+	//glEnable(GL_CULL_FACE);
+	//glCullFace(GL_BACK);
 
-	DrawModel(segModel, phongshader, "in_Position", "in_Normal", NULL);
+	// DrawModel(init_seg(sl), phongshader, "in_Position", "in_Normal", NULL);
+	draw_bolt(sl);
 
 	runfilter(truncateshader, fbo3, 0L, fbo2);
 
