@@ -18,7 +18,7 @@
 
 #define NUM_LIGHTS 4
 
-double TIMER = 0.0;
+float scale = 0.08;
 
 struct lightning_seg {
     int bd;
@@ -63,7 +63,6 @@ float get_phi(vec3 v) {
 }
 
 Model* gen_seg_model(lightning_seg *l) {
-    float scale = 1.00;
 	float top_width = l->width;
 	float bot_width = 0;
 	if(!l->children.empty()) {
@@ -137,7 +136,7 @@ void generate_lightning(vec3 start, vec3 end, lightning_seg *lightning, vec3 tot
 	lightning->children.push_back(main_child);
 	lightning->m = gen_seg_model(lightning);
 
-    if(std::rand() % 100 < 30.0 * progress) { // TODO: fix where the end points of the bolts generate
+    if(std::rand() % 100 < 30.0 * progress) {
         lightning_seg* secondary_child = new lightning_seg;
         secondary_child->width = lightning->width * 0.50;
         secondary_child->parent = lightning;
@@ -179,10 +178,25 @@ GLuint squareIndices[] = {0, 1, 2, 0, 2, 3};
 
 Model* squareModel;
 
+GLfloat floor_[] = {
+							-1000,-5 * scale,-1000,
+							-1000,-5 * scale, 1000,
+							1000,-5 * scale, 1000,
+							1000,-5 * scale, -1000};
+GLfloat floor_Normals[] = {
+							0,1,0,
+							0,1,0,
+							0,1,0,
+							0,1,0};
+GLuint floor_Indices[] = {0, 1, 2,
+						 0, 2, 3};
+
+Model* floor_Model;
+
 //----------------------Globals-------------------------------------------------
 Model *model1;
 FBOstruct *fbo1, *fbo2, *fbo3;
-GLuint phongshader = 0, plaintextureshader = 0, lowpassshader = 0, truncateshader = 0, addfiltershader = 0;
+GLuint phongshader = 0, litshader = 0, plaintextureshader = 0, lowpassshader = 0, truncateshader = 0, addfiltershader = 0;
 
 void runfilter(GLuint shader, FBOstruct *in1, FBOstruct *in2, FBOstruct *out)
 {
@@ -205,7 +219,7 @@ void runfilter(GLuint shader, FBOstruct *in1, FBOstruct *in2, FBOstruct *out)
 GLfloat prevt = 0;
 
 void draw_bolt(lightning_seg *start, GLfloat t, int d) {
-	DrawModel(start->m, phongshader, "in_Position", "in_Normal", NULL);
+	DrawModel(start->m, litshader, "in_Position", "in_Normal", NULL);
 
 	int mul = 15;
 	int modu = 700;
@@ -262,6 +276,7 @@ void init(void)
 	// Load and compile shaders
 	plaintextureshader = loadShaders("plaintextureshader.vert", "plaintextureshader.frag");  // puts texture on teapot
 	phongshader = loadShaders("phong.vert", "phong.frag");  // renders with light (used for initial renderin of teapot)
+	litshader = loadShaders("phong.vert", "lit.frag");  // renders with light (used for initial renderin of teapot)
 	lowpassshader = loadShaders("plaintextureshader.vert", "lowpass.frag");
 	truncateshader = loadShaders("plaintextureshader.vert", "truncate.frag");
 	addfiltershader = loadShaders("plaintextureshader.vert", "addfilter.frag");
@@ -279,7 +294,11 @@ void init(void)
 			(vec3 *)square, NULL, (vec2 *)squareTexCoord, NULL,
 			squareIndices, 4, 6);
 
-	vec3 cam = vec3(0, 0, 500);
+	floor_Model = LoadDataToModel(
+			(vec3 *)floor_, (vec3 *)floor_Normals, NULL, NULL,
+			floor_Indices, 4, 6);
+
+	vec3 cam = vec3(0, 0, 100);
 	vec3 point = vec3(0, 0, 0);
 	vec3 up = vec3(0, 1, 0);
 	viewMatrix = lookAtv(cam, point, up);
@@ -324,7 +343,28 @@ void display(void)
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
 
-	// TODO: animate
+	DrawModel(floor_Model, phongshader, "in_Position", "in_Normal", NULL);
+	DrawModel(model1, phongshader, "in_Position", "in_Normal", NULL);
+
+	glUseProgram(litshader);
+
+	vm2 = viewMatrix * modelToWorldMatrix;
+	// Scale and place bunny since it is too small
+	vm2 = vm2 * T(0, -8.5, 0);
+	vm2 = vm2 * S(80,80,80);
+
+	glUniformMatrix4fv(glGetUniformLocation(litshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
+	glUniformMatrix4fv(glGetUniformLocation(litshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
+
+
+	glUniform1i(glGetUniformLocation(litshader, "texUnit"), 0);
+
+	// Enable Z-buffering
+	glEnable(GL_DEPTH_TEST);
+	// Enable backface culling
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
+
 	draw_bolt(sl, t, 0);
 
 	runfilter(truncateshader, fbo3, 0L, fbo2);
@@ -361,7 +401,7 @@ void reshape(GLsizei w, GLsizei h)
 {
 	glViewport(0, 0, w, h);
 	GLfloat ratio = (GLfloat) w / (GLfloat) h;
-	projectionMatrix = perspective(90, ratio, 1.0, 1000);
+	projectionMatrix = perspective(90, ratio, 1.0, 10000000);
 }
 
 // Trackball
