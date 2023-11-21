@@ -4,7 +4,7 @@
 #include <iostream>
 #include <vector>
 #include <cstdlib>
-#include "MicroGlut.h"
+#include "Linux/MicroGlut.h"
 #define MAIN
 #include "VectorUtils4.h"
 #include "LittleOBJLoaderX.h"
@@ -18,6 +18,8 @@
 
 #define NUM_LIGHTS 4
 
+double TIMER = 0.0;
+
 struct lightning_seg {
     int bd;
     vec3 start;
@@ -27,9 +29,17 @@ struct lightning_seg {
     std::vector<struct lightning_seg*> children;
     std::vector<vec3> lights;
 	Model *m;
+	bool last = false;
 };
 
-lightning_seg *sl = new lightning_seg;
+lightning_seg *sl;
+
+float COS0 = cos(0);
+float SIN0 = sin(0);
+float COS2PIDIV3 = cos(2*M_PI/3);
+float SIN2PIDIV3 = sin(2*M_PI/3);
+float COS4PIDIV3 = cos(4*M_PI/3);
+float SIN4PIDIV3 = sin(4*M_PI/3);
 
 vec3 sphere_to_rect(float theta, float phi, float r, vec3 start) {
     float x_end = r * sin(theta) * cos(phi);
@@ -54,47 +64,57 @@ float get_phi(vec3 v) {
 
 Model* gen_seg_model(lightning_seg *l) {
     float scale = 1.00;
+	float top_width = l->width;
+	float bot_width = 0;
+	if(!l->children.empty()) {
+		bot_width = l->children[0]->width;
+		GLfloat ver[] = {
+			(GLfloat)(l->start.x + l->width * COS0) * scale, (GLfloat)l->start.y * scale, (GLfloat)(l->start.z + l->width * SIN0) * scale, // 0
+			(GLfloat)(l->start.x + l->width * COS2PIDIV3) * scale, (GLfloat)l->start.y * scale, (GLfloat)(l->start.z + l->width * SIN2PIDIV3) * scale, // 1
+			(GLfloat)(l->start.x + l->width * COS4PIDIV3) * scale, (GLfloat)l->start.y * scale, (GLfloat)(l->start.z + l->width * SIN4PIDIV3) * scale, // 2
+			(GLfloat)(l->end.x + bot_width * COS0) * scale, (GLfloat)l->end.y * scale, (GLfloat)(l->end.z + bot_width * SIN0) * scale, // 3
+			(GLfloat)(l->end.x + bot_width * COS2PIDIV3) * scale, (GLfloat)l->end.y * scale, (GLfloat)(l->end.z + bot_width * SIN2PIDIV3) * scale, // 4
+			(GLfloat)(l->end.x + bot_width * COS4PIDIV3) * scale, (GLfloat)l->end.y * scale, (GLfloat)(l->end.z + bot_width * SIN4PIDIV3) * scale, // 5
+		};
 
-	// for printing
-	float v0x = (GLfloat)(l->start.x + l->width * cos(0)) * scale;
-	float v0y = (GLfloat)l->start.y * scale;
-	float v0z = (GLfloat)(l->start.z + l->width * sin(0)) * scale; // 0
-	float v1x = (GLfloat)(l->start.x + l->width * cos(2*M_PI/3)) * scale;
-	float v1y = (GLfloat)l->start.y * scale;
-	float v1z = (GLfloat)(l->start.z + l->width * sin(2*M_PI/3)) * scale; // 1
-	float v2x = (GLfloat)(l->start.x + l->width * cos(4*M_PI/3)) * scale;
-	float v2y = (GLfloat)l->start.y * scale;
-	float v2z = (GLfloat)(l->start.z + l->width * sin(4*M_PI/3)) * scale; // 2
-	float v3x = (GLfloat)l->end.x * scale;
-	float v3y = (GLfloat)l->end.y * scale;
-	float v3z = (GLfloat)l->end.z * scale; // 3
+		GLuint ind[] = {3,2,0,
+						3,5,2,
+						5,1,2,
+						5,4,1,
+						4,0,1,
+						4,3,0};
 
-	GLfloat ver[] = {
-		(GLfloat)(l->start.x + l->width * cos(0)) * scale, (GLfloat)l->start.y * scale, (GLfloat)(l->start.z + l->width * sin(0)) * scale, // 0
-		(GLfloat)(l->start.x + l->width * cos(2*M_PI/3)) * scale, (GLfloat)l->start.y * scale, (GLfloat)(l->start.z + l->width * sin(2*M_PI/3)) * scale, // 1
-		(GLfloat)(l->start.x + l->width * cos(4*M_PI/3)) * scale, (GLfloat)l->start.y * scale, (GLfloat)(l->start.z + l->width * sin(4*M_PI/3)) * scale, // 2
-		(GLfloat)l->end.x * scale, (GLfloat)l->end.y * scale, (GLfloat)l->end.z * scale // 3
-	};
+		return LoadDataToModel(
+				(vec3 *)ver, NULL, NULL, NULL,
+				ind, 6, 18);
+	} else {
+		GLfloat ver[] = {
+			(GLfloat)(l->start.x + l->width * COS0) * scale, (GLfloat)l->start.y * scale, (GLfloat)(l->start.z + l->width * SIN0) * scale, // 0
+			(GLfloat)(l->start.x + l->width * COS2PIDIV3) * scale, (GLfloat)l->start.y * scale, (GLfloat)(l->start.z + l->width * SIN2PIDIV3) * scale, // 1
+			(GLfloat)(l->start.x + l->width * COS4PIDIV3) * scale, (GLfloat)l->start.y * scale, (GLfloat)(l->start.z + l->width * SIN4PIDIV3) * scale, // 2
+			(GLfloat)l->end.x * scale, (GLfloat)l->end.y * scale, (GLfloat)l->end.z * scale // 3
+		};
 
-	// std::cout << "first triangle: {{" << v3x << "," << v3y << "," << v3z << "},{" << v0x << "," << v0y << "," << v0z <<  "},{" << v2x << "," << v2y << "," << v2z <<  "}}" << std::endl;
-	// std::cout << "second triangle: {{" << v3x << "," << v3y << "," << v3z << "},{" << v2x << "," << v2y << "," << v2z <<  "},{" << v1x << "," << v1y << "," << v1z <<  "}}" << std::endl;
-	// std::cout << "third triangle: {{" << v3x << "," << v3y << "," << v3z << "},{" << v1x << "," << v1y << "," << v1z <<  "},{" << v0x << "," << v0y << "," << v0z <<  "}}" << std::endl;
+		GLuint ind[] = {3,2,0,
+						3,1,2,
+						3,0,1};
 
-    GLuint ind[] = {3,0,2,3,2,1,3,1,0};
-	return LoadDataToModel(
-			(vec3 *)ver, NULL, NULL, NULL,
-			ind, 4, 9);
+		return LoadDataToModel(
+				(vec3 *)ver, NULL, NULL, NULL,
+				ind, 4, 9);
+	}
+
 }
 
 
-void generate_lightning(vec3 start, vec3 end, lightning_seg *lightning, vec3 tot_start) {
-    //std::cout << "bolt depth: " << lightning->bd << std::endl;
+void generate_lightning(vec3 start, vec3 end, lightning_seg *lightning, vec3 tot_start, vec3 main_end) {
     lightning->start = start;
     float length_r = (std::rand() % 2000) / 4000.0 + 0.5;
-    //std::cout << "bolt len: " << length_r << std::endl;
     if (length_r >= Norm(end - start)) {
         lightning->end = end;
 		lightning->m = gen_seg_model(lightning);
+		if(end.x == main_end.x && end.y == main_end.y && end.z == main_end.z)
+			lightning->last = true;
         return;
     }
 
@@ -104,21 +124,19 @@ void generate_lightning(vec3 start, vec3 end, lightning_seg *lightning, vec3 tot
     float progress = Norm(end - start) / Norm(end - tot_start);
 
     float angle_theta = end_theta + (1 - (1-progress) * (1-progress)) * ((std::rand() % 160 - 80) * M_PI / 180.0);
-    //std::cout << "bolt theta: " << angle_theta << std::endl;
     float angle_phi = end_phi + (1 - (1-progress) * (1-progress)) * ((std::rand() % 160 - 80) * M_PI / 180.0);
-    //std::cout << "bolt phi: " << angle_phi << std::endl;
     vec3 seg_end = sphere_to_rect(angle_theta, angle_phi, length_r, start);
     lightning->end = seg_end;
 
-	lightning->m = gen_seg_model(lightning);
-
     lightning_seg* main_child = new lightning_seg;
-    main_child->width = lightning->width * 0.90;
+    main_child->width = lightning->width * 0.95;
     main_child->parent = lightning;
     main_child->bd = lightning->bd;
 
-    generate_lightning(lightning->end, end, main_child, tot_start);
+    generate_lightning(lightning->end, end, main_child, tot_start, main_end);
 	lightning->children.push_back(main_child);
+	lightning->m = gen_seg_model(lightning);
+
     if(std::rand() % 100 < 30.0 * progress) { // TODO: fix where the end points of the bolts generate
         lightning_seg* secondary_child = new lightning_seg;
         secondary_child->width = lightning->width * 0.50;
@@ -127,9 +145,8 @@ void generate_lightning(vec3 start, vec3 end, lightning_seg *lightning, vec3 tot
         float child_end_r = (std::rand() % 7000) / 1000.0 * exp(-secondary_child->bd);
         float child_theta = end_theta + (std::rand() % 100 - 50) * M_PI / 180.0;
         float child_phi = end_phi + (std::rand() % 100 - 50) * M_PI / 180.0;
-        std::cout << "new child at depth " << lightning->bd << " with r = " << child_end_r << ", theta = " << child_theta << ", phi = " << child_phi << std::endl;
 
-        generate_lightning(lightning->end, sphere_to_rect(child_theta, child_phi, child_end_r, lightning->end), secondary_child, tot_start);
+        generate_lightning(lightning->end, sphere_to_rect(child_theta, child_phi, child_end_r, lightning->end), secondary_child, tot_start, main_end);
 		lightning->children.push_back(secondary_child);
     }
 }
@@ -185,11 +202,33 @@ void runfilter(GLuint shader, FBOstruct *in1, FBOstruct *in2, FBOstruct *out)
     glFlush();
 }
 
-void draw_bolt(lightning_seg *start) {
+GLfloat prevt = 0;
+
+void draw_bolt(lightning_seg *start, GLfloat t, int d) {
 	DrawModel(start->m, phongshader, "in_Position", "in_Normal", NULL);
-	for(auto child : start->children) {
-		draw_bolt(child);
+
+	int mul = 15;
+	int modu = 700;
+
+	if((int)t % modu > d * mul) {
+		for(auto child : start->children) {
+			draw_bolt(child, t, d + 1);
+		}
 	}
+	
+	if((int)t % modu <= 50 && (int)prevt % modu > (int)t % modu) {
+		// TODO: fix so delete work
+		// delete_lightning(sl);
+		sl = new lightning_seg;
+
+		sl->bd = 0;
+		sl->width = 0.25;
+		vec3 st = {0.0, 5.0, 0.0};// rand_start();
+		vec3 en = st;
+		en.y = -5;
+		generate_lightning(st, en, sl, st, en);
+	}
+	prevt = t;
 }
 
 //-------------------------------------------------------------------------------------
@@ -201,15 +240,15 @@ void init(void)
 	std::cin >> seed;
 	std::srand(seed);
 
+	sl = new lightning_seg;
+
     std::cout << "start" << std::endl;
     sl->bd = 0;
     sl->width = 0.25;
     vec3 st = {0.0, 5.0, 0.0};// rand_start();
     vec3 en = st;
     en.y = -5;
-    generate_lightning(st, en, sl, st);
-
-    //init_seg(sl);
+    generate_lightning(st, en, sl, st, en);
 
 	dumpInfo();  // shader info
 
@@ -252,6 +291,8 @@ void display(void)
 {
 	mat4 vm2;
 
+	GLfloat t = (GLfloat) glutGet(GLUT_ELAPSED_TIME);
+
 	// This function is called whenever it is time to render
 	//  a new frame; due to the idle()-function below, this
 	//  function will get called several times per second
@@ -278,13 +319,13 @@ void display(void)
 	glUniform1i(glGetUniformLocation(phongshader, "texUnit"), 0);
 
 	// Enable Z-buffering
-	//glEnable(GL_DEPTH_TEST);
+	glEnable(GL_DEPTH_TEST);
 	// Enable backface culling
-	//glEnable(GL_CULL_FACE);
-	//glCullFace(GL_BACK);
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
 
-	// DrawModel(init_seg(sl), phongshader, "in_Position", "in_Normal", NULL);
-	draw_bolt(sl);
+	// TODO: animate
+	draw_bolt(sl, t, 0);
 
 	runfilter(truncateshader, fbo3, 0L, fbo2);
 
