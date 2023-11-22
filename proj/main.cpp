@@ -125,7 +125,8 @@ void generate_lightning(vec3 start, vec3 end, lightning_seg *lightning, vec3 tot
     float angle_phi = end_phi + (1 - (1-progress) * (1-progress)) * ((std::rand() % 160 - 80) * M_PI / 180.0);
     lightning->end = sphere_to_rect(angle_theta, angle_phi, length_r, start);
 
-    lightning->light = sphere_to_rect(angle_theta, angle_phi, length_r / 2, start) * scale;
+    // lightning->light = sphere_to_rect(angle_theta, angle_phi, length_r / 2, start) * scale;
+	lightning->light = start * scale;
 
     lightning_seg* main_child = new lightning_seg;
     main_child->width = lightning->width * 0.95;
@@ -230,8 +231,10 @@ int num_lights = 0;
 int mul = 15;
 int modu = 700;
 
+bool ANIMATE = true;
+
 void draw_bolt(lightning_seg *start, GLfloat t, int d) {
-	if((int)t % modu <= 50 && (int)prevt % modu > (int)t % modu) {
+	if((int)t % modu <= 50 && (int)prevt % modu > (int)t % modu && ANIMATE) {
 		delete_lightning(sl);
 		sl = new lightning_seg;
 
@@ -250,7 +253,7 @@ void draw_bolt(lightning_seg *start, GLfloat t, int d) {
 	lights[num_lights] = start->light;
 	num_lights++;
 
-	if((int)t % modu > d * mul) {
+	if((int)t % modu > d * mul || !ANIMATE) {
 		for(size_t i = 0; i < start->children.size(); i++) {
 			if(start->children.size() == 0) {
 				std::cout << "oh no" << std::endl;
@@ -314,7 +317,7 @@ void init(void)
 			(vec3 *)floor_, (vec3 *)floor_Normals, NULL, NULL,
 			floor_Indices, 4, 6);
 
-	vec3 cam = vec3(0.0, 0.0, 100.0);
+	vec3 cam = vec3(0.0, 0.0, 70.0);
 	vec3 point = vec3(0.0, 0.0, 0.0);
 	vec3 up = vec3(0.0, 1.0, 0.0);
 	viewMatrix = lookAtv(cam, point, up);
@@ -359,10 +362,14 @@ void display(void)
 	num_lights = 0;
 	draw_bolt(sl, t, 0);
 
-	lights[0] = vec3(0.0,0.0,0.0);
+	std::cout << "start: ";
+	printVec3(vec3(modelToWorldMatrix * vec4(sl->start * scale, 1.0)));
+	std::cout << "light: ";
+	printVec3(vec3(modelToWorldMatrix * vec4(lights[0], 1.0)));
 
 	for(int i = 0; i < num_lights; i++) {
 		lights[i] =  vec3(modelToWorldMatrix * vec4(lights[i], 1.0));
+		// lights[i] =  vec3(projectionMatrix * vm2 * vec4(lights[i], 1.0));
 	}
 
 	// Activate shader program

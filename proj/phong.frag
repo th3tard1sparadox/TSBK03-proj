@@ -34,10 +34,10 @@ void main(void)
 			specular = 1.0 * pow(specular, 150.0);
 		specular = max(specular, 0.0);
 		// Increased 1.0 to 2.0
-		shade += (0.7*diffuse + 1.0*specular) / num_lights;
+		shade += (1.0*diffuse + 2.0*specular) / num_lights;
 	}
 
-	shade = shade * 3.5;
+	shade = shade * 3.0;
 
 	outColor = vec4(shade, shade, shade, 1.0);
     // outColor = vec4(1.0);
