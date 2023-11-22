@@ -154,6 +154,7 @@ void delete_lightning(lightning_seg *l) {
     if(!l->children.empty()) {
         for(auto c : l->children) {
             delete_lightning(c);
+			l->children.clear();
         }
     }
     delete l;
@@ -225,14 +226,14 @@ void draw_bolt(lightning_seg *start, GLfloat t, int d) {
 	int modu = 700;
 
 	if((int)t % modu > d * mul) {
-		for(auto child : start->children) {
-			draw_bolt(child, t, d + 1);
+		for(int i = 0; i < start->children.size(); i++) {
+			draw_bolt(start->children[i], t, d + 1);
 		}
 	}
 	
 	if((int)t % modu <= 50 && (int)prevt % modu > (int)t % modu) {
 		// TODO: fix so delete work
-		// delete_lightning(sl);
+		delete_lightning(sl);
 		sl = new lightning_seg;
 
 		sl->bd = 0;
@@ -344,6 +345,12 @@ void display(void)
 	glCullFace(GL_BACK);
 
 	DrawModel(floor_Model, phongshader, "in_Position", "in_Normal", NULL);
+	vm2 = viewMatrix * modelToWorldMatrix;
+	// Scale and place bunny since it is too small
+	vm2 = vm2 * T(0, -8.5, 0);
+	vm2 = vm2 * T(20.0, -35.0, 5.0);
+	vm2 = vm2 * S(80,80,80);
+	glUniformMatrix4fv(glGetUniformLocation(phongshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
 	DrawModel(model1, phongshader, "in_Position", "in_Normal", NULL);
 
 	glUseProgram(litshader);
