@@ -7,6 +7,7 @@
 #include "Linux/MicroGlut.h"
 #define MAIN
 #include "VectorUtils4.h"
+// #include "VectorUtils3.h"
 #include "LittleOBJLoaderX.h"
 #include "GL_utilities.h"
 // uses framework Cocoa
@@ -15,8 +16,6 @@
 // initial width and heights
 #define W 512
 #define H 512
-
-#define NUM_LIGHTS 4
 
 float scale = 0.08;
 
@@ -27,7 +26,7 @@ struct lightning_seg {
     float width;
     struct lightning_seg *parent;
     std::vector<struct lightning_seg*> children;
-    std::vector<vec3> lights;
+    vec3 light;
 	Model *m;
 	bool last = false;
 };
@@ -124,13 +123,15 @@ void generate_lightning(vec3 start, vec3 end, lightning_seg *lightning, vec3 tot
 
     float angle_theta = end_theta + (1 - (1-progress) * (1-progress)) * ((std::rand() % 160 - 80) * M_PI / 180.0);
     float angle_phi = end_phi + (1 - (1-progress) * (1-progress)) * ((std::rand() % 160 - 80) * M_PI / 180.0);
-    vec3 seg_end = sphere_to_rect(angle_theta, angle_phi, length_r, start);
-    lightning->end = seg_end;
+    lightning->end = sphere_to_rect(angle_theta, angle_phi, length_r, start);
+
+    lightning->light = sphere_to_rect(angle_theta, angle_phi, length_r / 2, start) * scale;
 
     lightning_seg* main_child = new lightning_seg;
     main_child->width = lightning->width * 0.95;
     main_child->parent = lightning;
     main_child->bd = lightning->bd;
+    main_child->light = lightning->light;
 
     generate_lightning(lightning->end, end, main_child, tot_start, main_end);
 	lightning->children.push_back(main_child);
@@ -141,11 +142,15 @@ void generate_lightning(vec3 start, vec3 end, lightning_seg *lightning, vec3 tot
         secondary_child->width = lightning->width * 0.50;
         secondary_child->parent = lightning;
         secondary_child->bd = lightning->bd + 1;
+    	secondary_child->light = lightning->light;
+
         float child_end_r = (std::rand() % 7000) / 1000.0 * exp(-secondary_child->bd);
         float child_theta = end_theta + (std::rand() % 100 - 50) * M_PI / 180.0;
         float child_phi = end_phi + (std::rand() % 100 - 50) * M_PI / 180.0;
+		vec3 child_end = sphere_to_rect(child_theta, child_phi, child_end_r, lightning->end);
+		child_end.y = std::max(child_end.y, main_end.y);
 
-        generate_lightning(lightning->end, sphere_to_rect(child_theta, child_phi, child_end_r, lightning->end), secondary_child, tot_start, main_end);
+        generate_lightning(lightning->end, child_end, secondary_child, tot_start, main_end);
 		lightning->children.push_back(secondary_child);
     }
 }
@@ -219,20 +224,25 @@ void runfilter(GLuint shader, FBOstruct *in1, FBOstruct *in2, FBOstruct *out)
 
 GLfloat prevt = 0;
 
-void draw_bolt(lightning_seg *start, GLfloat t, int d) {
+vec3 lights[70];
+int num_lights = 0;
+
+void draw_bolt(lightning_seg *start, GLfloat t, int d, int segments) {
+	segments++;
 	DrawModel(start->m, litshader, "in_Position", "in_Normal", NULL);
+	// lights[num_lights] = start->light;
+	// num_lights++;
 
 	int mul = 15;
 	int modu = 700;
 
 	if((int)t % modu > d * mul) {
-		for(int i = 0; i < start->children.size(); i++) {
-			draw_bolt(start->children[i], t, d + 1);
+		for(size_t i = 0; i < start->children.size(); i++) {
+			draw_bolt(start->children[i], t, d + 1, segments);
 		}
 	}
 	
 	if((int)t % modu <= 50 && (int)prevt % modu > (int)t % modu) {
-		// TODO: fix so delete work
 		delete_lightning(sl);
 		sl = new lightning_seg;
 
@@ -242,6 +252,8 @@ void draw_bolt(lightning_seg *start, GLfloat t, int d) {
 		vec3 en = st;
 		en.y = -5;
 		generate_lightning(st, en, sl, st, en);
+
+		num_lights = 0;
 	}
 	prevt = t;
 }
@@ -257,7 +269,6 @@ void init(void)
 
 	sl = new lightning_seg;
 
-    std::cout << "start" << std::endl;
     sl->bd = 0;
     sl->width = 0.25;
     vec3 st = {0.0, 5.0, 0.0};// rand_start();
@@ -299,9 +310,9 @@ void init(void)
 			(vec3 *)floor_, (vec3 *)floor_Normals, NULL, NULL,
 			floor_Indices, 4, 6);
 
-	vec3 cam = vec3(0, 0, 100);
-	vec3 point = vec3(0, 0, 0);
-	vec3 up = vec3(0, 1, 0);
+	vec3 cam = vec3(0.0, 0.0, 100.0);
+	vec3 point = vec3(0.0, 0.0, 0.0);
+	vec3 up = vec3(0.0, 1.0, 0.0);
 	viewMatrix = lookAtv(cam, point, up);
 	modelToWorldMatrix = IdentityMatrix();
 }
@@ -323,18 +334,35 @@ void display(void)
 	// Clear framebuffer & zbuffer
 	glClearColor(0.1, 0.1, 0.3, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	
+	glUseProgram(litshader);
+
+	vm2 = viewMatrix * modelToWorldMatrix;
+	vm2 = vm2 * T(0, -8.5, 0);
+	vm2 = vm2 * S(80,80,80);
+
+	glUniformMatrix4fv(glGetUniformLocation(litshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
+	glUniformMatrix4fv(glGetUniformLocation(litshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
+
+	glUniform1i(glGetUniformLocation(litshader, "texUnit"), 0);
+
+	// Enable Z-buffering
+	glEnable(GL_DEPTH_TEST);
+	// Enable backface culling
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
+
+	num_lights = 0;
+	draw_bolt(sl, t, 0, 0);
 
 	// Activate shader program
 	glUseProgram(phongshader);
 
-	vm2 = viewMatrix * modelToWorldMatrix;
-	// Scale and place bunny since it is too small
-	vm2 = vm2 * T(0, -8.5, 0);
-	vm2 = vm2 * S(80,80,80);
+	// glUniform3fv(glGetUniformLocation(phongshader, "lights"), 70, (GLfloat *)lights);
+	// glUniform1i(glGetUniformLocation(phongshader, "num_lights"), num_lights);
 
 	glUniformMatrix4fv(glGetUniformLocation(phongshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
 	glUniformMatrix4fv(glGetUniformLocation(phongshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
-
 
 	glUniform1i(glGetUniformLocation(phongshader, "texUnit"), 0);
 
@@ -345,34 +373,13 @@ void display(void)
 	glCullFace(GL_BACK);
 
 	DrawModel(floor_Model, phongshader, "in_Position", "in_Normal", NULL);
+
 	vm2 = viewMatrix * modelToWorldMatrix;
-	// Scale and place bunny since it is too small
 	vm2 = vm2 * T(0, -8.5, 0);
 	vm2 = vm2 * T(20.0, -35.0, 5.0);
 	vm2 = vm2 * S(80,80,80);
 	glUniformMatrix4fv(glGetUniformLocation(phongshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
 	DrawModel(model1, phongshader, "in_Position", "in_Normal", NULL);
-
-	glUseProgram(litshader);
-
-	vm2 = viewMatrix * modelToWorldMatrix;
-	// Scale and place bunny since it is too small
-	vm2 = vm2 * T(0, -8.5, 0);
-	vm2 = vm2 * S(80,80,80);
-
-	glUniformMatrix4fv(glGetUniformLocation(litshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
-	glUniformMatrix4fv(glGetUniformLocation(litshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
-
-
-	glUniform1i(glGetUniformLocation(litshader, "texUnit"), 0);
-
-	// Enable Z-buffering
-	glEnable(GL_DEPTH_TEST);
-	// Enable backface culling
-	glEnable(GL_CULL_FACE);
-	glCullFace(GL_BACK);
-
-	draw_bolt(sl, t, 0);
 
 	runfilter(truncateshader, fbo3, 0L, fbo2);
 
