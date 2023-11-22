@@ -227,34 +227,41 @@ GLfloat prevt = 0;
 vec3 lights[70];
 int num_lights = 0;
 
+int mul = 15;
+int modu = 700;
+
 void draw_bolt(lightning_seg *start, GLfloat t, int d, int segments) {
-	segments++;
-	DrawModel(start->m, litshader, "in_Position", "in_Normal", NULL);
-	// lights[num_lights] = start->light;
-	// num_lights++;
-
-	int mul = 15;
-	int modu = 700;
-
-	if((int)t % modu > d * mul) {
-		for(size_t i = 0; i < start->children.size(); i++) {
-			draw_bolt(start->children[i], t, d + 1, segments);
-		}
-	}
-	
 	if((int)t % modu <= 50 && (int)prevt % modu > (int)t % modu) {
 		delete_lightning(sl);
 		sl = new lightning_seg;
 
 		sl->bd = 0;
 		sl->width = 0.25;
-		vec3 st = {0.0, 5.0, 0.0};// rand_start();
+		vec3 st = {0.0, 5.0, 0.0};
 		vec3 en = st;
 		en.y = -5;
 		generate_lightning(st, en, sl, st, en);
 
 		num_lights = 0;
+		prevt = t;
+		return;
 	}
+
+	segments++;
+	DrawModel(start->m, litshader, "in_Position", "in_Normal", NULL);
+	lights[num_lights] = start->light;
+	num_lights++;
+
+	if((int)t % modu > d * mul) {
+		for(size_t i = 0; i < start->children.size(); i++) {
+			if(start->children.size() == 0) {
+				std::cout << "oh no" << std::endl;
+				return;
+			}
+			draw_bolt(start->children[i], t, d + 1, segments);
+		}
+	}
+
 	prevt = t;
 }
 
@@ -354,6 +361,10 @@ void display(void)
 
 	num_lights = 0;
 	draw_bolt(sl, t, 0, 0);
+
+	for(int i = 0; i < num_lights; i++) {
+		lights[i] = vm2 * lights[i];
+	}
 
 	// Activate shader program
 	glUseProgram(phongshader);
