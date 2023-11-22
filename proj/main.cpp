@@ -47,8 +47,8 @@ vec3 sphere_to_rect(float theta, float phi, float r, vec3 start) {
     return {start.x + x_end, start.y + y_end, start.z + z_end};
 }
 
-vec3 rand_start() {
-    return {float(std::rand() % 100), 20.0, float(std::rand() % 100)};
+vec3 rand_point(float y) {
+    return {float(std::rand() % 1000 / 250) - 2.0, y, float(std::rand() % 1000 / 250) - 2.0};
 }
 
 float get_theta(vec3 v) {
@@ -230,16 +230,15 @@ int num_lights = 0;
 int mul = 15;
 int modu = 700;
 
-void draw_bolt(lightning_seg *start, GLfloat t, int d, int segments) {
+void draw_bolt(lightning_seg *start, GLfloat t, int d) {
 	if((int)t % modu <= 50 && (int)prevt % modu > (int)t % modu) {
 		delete_lightning(sl);
 		sl = new lightning_seg;
 
 		sl->bd = 0;
 		sl->width = 0.25;
-		vec3 st = {0.0, 5.0, 0.0};
-		vec3 en = st;
-		en.y = -5;
+		vec3 st = rand_point(5.0);
+		vec3 en = rand_point(-5.0);
 		generate_lightning(st, en, sl, st, en);
 
 		num_lights = 0;
@@ -247,7 +246,6 @@ void draw_bolt(lightning_seg *start, GLfloat t, int d, int segments) {
 		return;
 	}
 
-	segments++;
 	DrawModel(start->m, litshader, "in_Position", "in_Normal", NULL);
 	lights[num_lights] = start->light;
 	num_lights++;
@@ -258,7 +256,7 @@ void draw_bolt(lightning_seg *start, GLfloat t, int d, int segments) {
 				std::cout << "oh no" << std::endl;
 				return;
 			}
-			draw_bolt(start->children[i], t, d + 1, segments);
+			draw_bolt(start->children[i], t, d + 1);
 		}
 	}
 
@@ -278,9 +276,8 @@ void init(void)
 
     sl->bd = 0;
     sl->width = 0.25;
-    vec3 st = {0.0, 5.0, 0.0};// rand_start();
-    vec3 en = st;
-    en.y = -5;
+    vec3 st = rand_point(5.0);
+    vec3 en = rand_point(-5.0);
     generate_lightning(st, en, sl, st, en);
 
 	dumpInfo();  // shader info
@@ -360,17 +357,20 @@ void display(void)
 	glCullFace(GL_BACK);
 
 	num_lights = 0;
-	draw_bolt(sl, t, 0, 0);
+	draw_bolt(sl, t, 0);
+
+	lights[0] = vec3(0.0,0.0,0.0);
 
 	for(int i = 0; i < num_lights; i++) {
-		lights[i] = vm2 * lights[i];
+		lights[i] =  vec3(modelToWorldMatrix * vec4(lights[i], 1.0));
 	}
 
 	// Activate shader program
 	glUseProgram(phongshader);
 
-	// glUniform3fv(glGetUniformLocation(phongshader, "lights"), 70, (GLfloat *)lights);
-	// glUniform1i(glGetUniformLocation(phongshader, "num_lights"), num_lights);
+	glUniform3fv(glGetUniformLocation(phongshader, "lights"), 70, (GLfloat *)lights);
+	int tmp = num_lights;
+	glUniform1i(glGetUniformLocation(phongshader, "num_lights"), tmp);
 
 	glUniformMatrix4fv(glGetUniformLocation(phongshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
 	glUniformMatrix4fv(glGetUniformLocation(phongshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
