@@ -28,7 +28,7 @@ void main(void)
 	float shade = 0.0;
 	for(int i = 0; i < num_lights; i++) {
 		// vec3 light = vec3(modelviewMatrix * vec4(lights[i], 1.0)); // Given in VIEW coordinates! You usually specify light sources in world coordinates.
-		vec3 light = lights[i]; // Given in VIEW coordinates! You usually specify light sources in world coordinates.
+		vec3 light = normalize(lights[i] - exSurface); // Given in VIEW coordinates! You usually specify light sources in world coordinates.
 		// vec3 light = vec3(0.0, 0.0, 1.0); // Given in VIEW coordinates! You usually specify light sources in world coordinates.
 		
 		// Diffuse
@@ -43,11 +43,11 @@ void main(void)
 			specular = 1.0 * pow(specular, 150.0);
 		specular = max(specular, 0.0);
 		// Increased 1.0 to 2.0
-		shade += (0.5*diffuse + 0.0*specular) / num_lights;
+		shade += (0.7*diffuse + 1.0*specular) / num_lights;
 	}
 
-	shade = shade * 3.0;
+	shade = shade * 1.0;
 
-	outColor = vec4(shade, shade, shade, 1.0) * vec4(0.0, 1.0, 0.0, 1.0);
+	outColor = vec4(shade, shade, shade, 1.0);
     // outColor = vec4(1.0);
 }
