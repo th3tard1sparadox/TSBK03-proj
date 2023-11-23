@@ -125,8 +125,11 @@ void generate_lightning(vec3 start, vec3 end, lightning_seg *lightning, vec3 tot
     float angle_phi = end_phi + (1 - (1-progress) * (1-progress)) * ((std::rand() % 160 - 80) * M_PI / 180.0);
     lightning->end = sphere_to_rect(angle_theta, angle_phi, length_r, start);
 
-    // lightning->light = sphere_to_rect(angle_theta, angle_phi, length_r / 2, start) * scale;
-	lightning->light = start * scale;
+    lightning->light = sphere_to_rect(angle_theta, angle_phi, length_r / 2, start);
+    lightning->light.x = lightning->light.x * scale;
+    lightning->light.y = lightning->light.y * scale;
+    lightning->light.z = lightning->light.z * scale;
+	// lightning->light = start * scale;
 
     lightning_seg* main_child = new lightning_seg;
     main_child->width = lightning->width * 0.95;
@@ -249,7 +252,7 @@ void draw_bolt(lightning_seg *start, GLfloat t, int d) {
 		return;
 	}
 
-	// DrawModel(start->m, litshader, "in_Position", "in_Normal", NULL);
+	DrawModel(start->m, litshader, "in_Position", "in_Normal", NULL);
 	lights[num_lights] = start->light;
 	num_lights++;
 
@@ -328,6 +331,7 @@ void init(void)
 void display(void)
 {
 	mat4 vm2;
+	mat4 vm3;
 
 	GLfloat t = (GLfloat) glutGet(GLUT_ELAPSED_TIME);
 
@@ -369,7 +373,13 @@ void display(void)
 
 	for(int i = 0; i < num_lights; i++) {
 		//lights[i] =  vec3(modelToWorldMatrix * vec4(lights[i], 1.0));
-		lights[i] =  vec3(vm2 * vec4(lights[i], 1.0));
+		vm3 = viewMatrix * modelToWorldMatrix;
+		vm3 = vm3 * T(0, -8.5, 0);
+		vm3 = vm3 * S(80,80,80);
+		vm3 = vm3 * T(lights[i].x, lights[i].y, lights[i].z);
+		lights[i] =  vec3(vm3 * vec4(lights[i], 1.0));
+		glUniformMatrix4fv(glGetUniformLocation(litshader, "modelviewMatrix"), 1, GL_TRUE, vm3.m);
+		// DrawModel(model1, litshader, "in_Position", "in_Normal", NULL);
 	}
 
 	// Activate shader program

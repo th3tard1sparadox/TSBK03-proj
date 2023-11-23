@@ -48,6 +48,6 @@ void main(void)
 
 	shade = shade * 3.0;
 
-	outColor = vec4(shade, shade, shade, 1.0) * vec4(1.0, 0.0, 0.0, 1.0);
+	outColor = vec4(shade, shade, shade, 1.0) * vec4(0.0, 1.0, 0.0, 1.0);
     // outColor = vec4(1.0);
 }
