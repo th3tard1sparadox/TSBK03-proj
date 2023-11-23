@@ -249,7 +249,7 @@ void draw_bolt(lightning_seg *start, GLfloat t, int d) {
 		return;
 	}
 
-	DrawModel(start->m, litshader, "in_Position", "in_Normal", NULL);
+	// DrawModel(start->m, litshader, "in_Position", "in_Normal", NULL);
 	lights[num_lights] = start->light;
 	num_lights++;
 
@@ -362,14 +362,14 @@ void display(void)
 	num_lights = 0;
 	draw_bolt(sl, t, 0);
 
-	std::cout << "start: ";
-	printVec3(vec3(modelToWorldMatrix * vec4(sl->start * scale, 1.0)));
-	std::cout << "light: ";
-	printVec3(vec3(modelToWorldMatrix * vec4(lights[0], 1.0)));
+	// std::cout << "start: ";
+	// printVec3(vec3(modelToWorldMatrix * vec4(sl->start * scale, 1.0)));
+	// std::cout << "light: ";
+	// printVec3(vec3(modelToWorldMatrix * vec4(lights[0], 1.0)));
 
 	for(int i = 0; i < num_lights; i++) {
-		lights[i] =  vec3(modelToWorldMatrix * vec4(lights[i], 1.0));
-		// lights[i] =  vec3(projectionMatrix * vm2 * vec4(lights[i], 1.0));
+		//lights[i] =  vec3(modelToWorldMatrix * vec4(lights[i], 1.0));
+		lights[i] =  vec3(vm2 * vec4(lights[i], 1.0));
 	}
 
 	// Activate shader program
@@ -401,7 +401,7 @@ void display(void)
 
 	runfilter(truncateshader, fbo3, 0L, fbo2);
 
-	int count = 100;
+	int count = 0;
 	for (int i = 0; i < count; i++) {
 		runfilter(lowpassshader, fbo2, 0L, fbo1);
 		runfilter(lowpassshader, fbo1, 0L, fbo2);
