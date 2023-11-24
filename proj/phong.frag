@@ -12,7 +12,7 @@ in vec3 exNormal; // Phong
 in vec3 exSurface; // Phong (specular)
 
 // uniform mat4 modelviewMatrix;
-uniform vec3 lights[70];
+uniform vec3 lights[70 * 3];
 uniform int num_lights;
 
 // vec3 col[5];
@@ -45,8 +45,6 @@ void main(void)
 		// Increased 1.0 to 2.0
 		shade += (0.7*diffuse + 1.0*specular) / num_lights;
 	}
-
-	shade = shade * 1.0;
 
 	outColor = vec4(shade, shade, shade, 1.0);
     // outColor = vec4(1.0);

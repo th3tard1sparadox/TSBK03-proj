@@ -110,6 +110,7 @@ void generate_lightning(vec3 start, vec3 end, lightning_seg *lightning, vec3 tot
     float length_r = (std::rand() % 2000) / 4000.0 + 0.5;
     if (length_r >= Norm(end - start)) {
         lightning->end = end;
+    	lightning->light = normalize(lightning->end) * Norm(end - start) / 2 * scale;
 		lightning->m = gen_seg_model(lightning);
 		if(end.x == main_end.x && end.y == main_end.y && end.z == main_end.z)
 			lightning->last = true;
@@ -125,11 +126,7 @@ void generate_lightning(vec3 start, vec3 end, lightning_seg *lightning, vec3 tot
     float angle_phi = end_phi + (1 - (1-progress) * (1-progress)) * ((std::rand() % 160 - 80) * M_PI / 180.0);
     lightning->end = sphere_to_rect(angle_theta, angle_phi, length_r, start);
 
-    lightning->light = sphere_to_rect(angle_theta, angle_phi, length_r / 2, start);
-    lightning->light.x = lightning->light.x * scale;
-    lightning->light.y = lightning->light.y * scale;
-    lightning->light.z = lightning->light.z * scale;
-	// lightning->light = start * scale;
+    lightning->light = sphere_to_rect(angle_theta, angle_phi, length_r / 2, start) * scale;
 
     lightning_seg* main_child = new lightning_seg;
     main_child->width = lightning->width * 0.95;
@@ -228,13 +225,13 @@ void runfilter(GLuint shader, FBOstruct *in1, FBOstruct *in2, FBOstruct *out)
 
 GLfloat prevt = 0;
 
-vec3 lights[70];
+vec3 lights[70 * 3];
 int num_lights = 0;
 
 int mul = 15;
 int modu = 700;
 
-bool ANIMATE = true;
+bool ANIMATE = false;
 
 void draw_bolt(lightning_seg *start, GLfloat t, int d) {
 	if((int)t % modu <= 50 && (int)prevt % modu > (int)t % modu && ANIMATE) {
@@ -254,6 +251,10 @@ void draw_bolt(lightning_seg *start, GLfloat t, int d) {
 
 	DrawModel(start->m, litshader, "in_Position", "in_Normal", NULL);
 	lights[num_lights] = start->light;
+	num_lights++;
+	lights[num_lights] = start->start * scale;
+	num_lights++;
+	lights[num_lights] = start->end * scale;
 	num_lights++;
 
 	if((int)t % modu > d * mul || !ANIMATE) {
@@ -379,13 +380,12 @@ void display(void)
 		vm3 = vm3 * T(lights[i].x, lights[i].y, lights[i].z);
 		lights[i] =  vec3(vm3 * vec4(lights[i], 1.0));
 		glUniformMatrix4fv(glGetUniformLocation(litshader, "modelviewMatrix"), 1, GL_TRUE, vm3.m);
-		// DrawModel(model1, litshader, "in_Position", "in_Normal", NULL);
 	}
 
 	// Activate shader program
 	glUseProgram(phongshader);
 
-	glUniform3fv(glGetUniformLocation(phongshader, "lights"), 70, (GLfloat *)lights);
+	glUniform3fv(glGetUniformLocation(phongshader, "lights"), 70 * 3, (GLfloat *)lights);
 	int tmp = num_lights;
 	glUniform1i(glGetUniformLocation(phongshader, "num_lights"), tmp);
 
@@ -411,7 +411,7 @@ void display(void)
 
 	runfilter(truncateshader, fbo3, 0L, fbo2);
 
-	int count = 0;
+	int count = 100;
 	for (int i = 0; i < count; i++) {
 		runfilter(lowpassshader, fbo2, 0L, fbo1);
 		runfilter(lowpassshader, fbo1, 0L, fbo2);
