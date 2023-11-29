@@ -203,7 +203,7 @@ Model* floor_Model;
 //----------------------Globals-------------------------------------------------
 Model *model1;
 FBOstruct *fbo1, *fbo2, *fbo3;
-GLuint depthshader = 0, ssaoshader = 0, phongshader = 0, litshader = 0, plaintextureshader = 0, lowpassshader = 0, truncateshader = 0, addfiltershader = 0, multfiltershader = 0;
+GLuint depthshader = 0, normalshader = 0, ssaoshader = 0, phongshader = 0, litshader = 0, plaintextureshader = 0, lowpassshader = 0, truncateshader = 0, addfiltershader = 0, multfiltershader = 0;
 
 void runfilter(GLuint shader, FBOstruct *in1, FBOstruct *in2, FBOstruct *out)
 {
@@ -227,6 +227,8 @@ GLfloat prevt = 0;
 
 vec3 lights[70 * 3];
 int num_lights = 0;
+
+vec3 samples[64];
 
 int mul = 15;
 int modu = 700;
@@ -270,6 +272,28 @@ void draw_bolt(lightning_seg *start, GLfloat t, int d) {
 	prevt = t;
 }
 
+float rand_float() {
+	int ran = std::rand();
+	return (float(ran % 10000) / 10000);
+}
+
+void gen_samples() {
+	for(int i = 0; i < 64; ++i) {
+		vec3 sample = vec3(rand_float() * 2.0 - 1.0, rand_float() * 2.0 - 1.0, rand_float());
+		sample = normalize(sample);
+		sample *= rand_float();
+		sample *= 0.0001;
+
+		// float scale = float(i) / 64.0;
+
+		
+		// scale = 0.1 + scale * scale * (1.0 - 0.1);
+		// sample *= scale;
+		samples[i] = sample;
+		printVec3(sample);
+	}
+}
+
 //-------------------------------------------------------------------------------------
 
 void init(void)
@@ -287,6 +311,8 @@ void init(void)
     vec3 en = rand_point(-5.0);
     generate_lightning(st, en, sl, st, en);
 
+	gen_samples();
+
 	dumpInfo();  // shader info
 
 	// GL inits
@@ -301,6 +327,7 @@ void init(void)
 	phongshader = loadShaders("phong.vert", "phong.frag");  // renders with light (used for initial renderin of teapot)
 	ssaoshader = loadShaders("phong.vert", "ssao.frag");  // renders with light (used for initial renderin of teapot)
 	depthshader = loadShaders("phong.vert", "depth.frag");  // renders with light (used for initial renderin of teapot)
+	normalshader = loadShaders("phong.vert", "normal.frag");  // renders with light (used for initial renderin of teapot)
 	litshader = loadShaders("phong.vert", "lit.frag");  // renders with light (used for initial renderin of teapot)
 	lowpassshader = loadShaders("plaintextureshader.vert", "lowpass.frag");
 	truncateshader = loadShaders("plaintextureshader.vert", "truncate.frag");
@@ -378,13 +405,48 @@ void display(void)
 	DrawModel(model1, depthshader, "in_Position", NULL, NULL);
 	// DrawModel(model1, depthshader, "in_Position", "in_Normal", NULL);
 
-	useFBO(fbo2, fbo3, 0L);
+	useFBO(fbo1, 0L, 0L);
+
+	// Clear framebuffer & zbuffer
+	glClearColor(0.1, 0.1, 0.3, 0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	
+	glUseProgram(normalshader);
+	
+	vm2 = viewMatrix * modelToWorldMatrix;
+	vm2 = vm2 * T(0, -8.5, 0);
+	vm2 = vm2 * S(80,80,80);
+
+	glUniformMatrix4fv(glGetUniformLocation(normalshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
+	glUniformMatrix4fv(glGetUniformLocation(normalshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
+
+	glUniform1i(glGetUniformLocation(normalshader, "texUnit"), 0);
+
+	// Enable Z-buffering
+	glEnable(GL_DEPTH_TEST);
+	// Enable backface culling
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
+
+
+	DrawModel(floor_Model, normalshader, "in_Position", NULL, NULL);
+
+	vm2 = viewMatrix * modelToWorldMatrix;
+	vm2 = vm2 * T(0, -8.5, 0);
+	vm2 = vm2 * T(20.0, -35.0, 5.0);
+	vm2 = vm2 * S(80,80,80);
+	glUniformMatrix4fv(glGetUniformLocation(normalshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
+	DrawModel(model1, normalshader, "in_Position", NULL, NULL);
+
+	useFBO(fbo2, fbo3, fbo1);
 
 	// Clear framebuffer & zbuffer
 	glClearColor(0.1, 0.1, 0.3, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
 	glUseProgram(ssaoshader);
+	
+	glUniform3fv(glGetUniformLocation(phongshader, "samples"), 64 * 3, (GLfloat *)samples);
 	
 	vm2 = viewMatrix * modelToWorldMatrix;
 	vm2 = vm2 * T(0, -8.5, 0);
@@ -394,6 +456,7 @@ void display(void)
 	glUniformMatrix4fv(glGetUniformLocation(ssaoshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
 
 	glUniform1i(glGetUniformLocation(ssaoshader, "texUnit"), 0);
+ 	glUniform1i(glGetUniformLocation(ssaoshader, "texUnit2"), 1);
 
 	// Enable Z-buffering
 	glEnable(GL_DEPTH_TEST);

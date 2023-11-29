@@ -14,5 +14,5 @@ in vec3 exSurface; // Phong (specular)
 
 void main(void)
 {
-	outColor = vec4(exSurface.x, exSurface.y, exSurface.z, 1.0);
+	outColor = vec4(normalize(exNormal).xyz, 1.0);
 }
