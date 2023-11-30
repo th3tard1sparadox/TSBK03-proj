@@ -10,8 +10,10 @@
 
 out vec4 outColor;
 in vec3 exNormal; // Phong
+in vec3 outNormal; // Phong
 
 void main(void)
 {
+	// outColor = vec4(normalize(outNormal.xyz), 1.0);
 	outColor = vec4(normalize(exNormal.xyz), 1.0);
 }

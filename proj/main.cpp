@@ -186,10 +186,10 @@ GLuint squareIndices[] = {0, 1, 2, 0, 2, 3};
 Model* squareModel;
 
 GLfloat floor_[] = {
-							-10,-5 * scale,-10,
-							-10,-5 * scale, 10,
-							10,-5 * scale, 10,
-							10,-5 * scale, -10};
+							-1,-5 * scale,-1,
+							-1,-5 * scale, 1,
+							1,-5 * scale, 1,
+							1,-5 * scale, -1};
 GLfloat floor_Normals[] = {
 							0,1,0,
 							0,1,0,
@@ -282,11 +282,14 @@ float rand_float() {
 void gen_samples() {
 	vec3 sample;
 	for(int i = 0; i < 200; ++i) {
-		bool ok = false;
-		while(!ok) {
-			sample = vec3(rand_float() * 2.0 - 1.0, rand_float() * 2.0 - 1.0, rand_float());
-			// if(dot(sample, vec3(0.0, 0.0, 1.0)) > 0.1)
-				ok = true;
+		if(i % 4 == 0) {
+			sample = vec3(- rand_float(), -rand_float(), rand_float());
+		} else if(i % 4 == 1){
+			sample = vec3(- rand_float(), rand_float(), rand_float());
+		} else if(i % 4 == 2){
+			sample = vec3(rand_float(), -rand_float(), rand_float());
+		} else {
+			sample = vec3(rand_float(), rand_float(), rand_float());
 		}
 		sample = normalize(sample);
 		sample *= rand_float();
@@ -435,7 +438,7 @@ void display(void)
 
 		vm2 = viewMatrix * modelToWorldMatrix;
 		vm2 = vm2 * T(0, -8.5, 0);
-		vm2 = vm2 * T(20.0, -35.0, 5.0);
+		vm2 = vm2 * T(20.0, -36.0, 5.0);
 		vm2 = vm2 * S(80,80,80);
 		glUniformMatrix4fv(glGetUniformLocation(depthshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
 		DrawModel(model1, depthshader, "in_Position", NULL, NULL);
@@ -467,13 +470,13 @@ void display(void)
 
 		vm2 = viewMatrix * modelToWorldMatrix;
 		vm2 = vm2 * T(0, -8.5, 0);
-		vm2 = vm2 * T(20.0, -35.0, 5.0);
+		vm2 = vm2 * T(20.0, -36.0, 5.0);
 		vm2 = vm2 * S(80,80,80);
 		glUniformMatrix4fv(glGetUniformLocation(normalshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
 		DrawModel(model1, normalshader, "in_Position", "in_Normal", NULL);
 
 		// ---------- create ssao
-		useFBO(fbo2, fbo3, fbo1);
+		useFBO(0L, fbo3, fbo1);
 
 		// Clear framebuffer & zbuffer
 		glClearColor(0.1, 0.1, 0.3, 0);
@@ -484,6 +487,7 @@ void display(void)
 		glUniform3fv(glGetUniformLocation(ssaoshader, "samples"), 200 * 3, (GLfloat *)samples);
 
 		glUniformMatrix4fv(glGetUniformLocation(ssaoshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
+		glUniformMatrix4fv(glGetUniformLocation(ssaoshader, "viewMatrix"), 1, GL_TRUE, viewMatrix.m);
 
 		glUniform1i(glGetUniformLocation(ssaoshader, "texUnit"), 0);
 		glUniform1i(glGetUniformLocation(ssaoshader, "texUnit2"), 1);
@@ -543,7 +547,7 @@ void display(void)
 
 	vm2 = viewMatrix * modelToWorldMatrix;
 	vm2 = vm2 * T(0, -8.5, 0);
-	vm2 = vm2 * T(20.0, -35.0, 5.0);
+	vm2 = vm2 * T(20.0, -36.0, 5.0);
 	vm2 = vm2 * S(80,80,80);
 	glUniformMatrix4fv(glGetUniformLocation(phongshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
 	DrawModel(model1, phongshader, "in_Position", "in_Normal", NULL);
@@ -621,7 +625,7 @@ void display(void)
 	}
 
 	// ---------- add lighting bolt to scene
-	useFBO(0L, fbo2, fbo3);
+	useFBO(fbo1, fbo2, fbo3);
 	glClearColor(0.0, 0.0, 0.0, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
