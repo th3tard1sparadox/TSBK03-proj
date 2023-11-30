@@ -9,10 +9,9 @@
 // You usually give light sources in world coordinates.
 
 out vec4 outColor;
-in vec3 exNormal; // Phong
 in vec3 exSurface; // Phong (specular)
 
 void main(void)
 {
-	outColor = vec4(exSurface.x, exSurface.y, exSurface.z, 1.0);
+	outColor = vec4(exSurface.xyz, 1.0);
 }

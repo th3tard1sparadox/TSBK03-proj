@@ -233,7 +233,8 @@ vec3 samples[64];
 int mul = 15;
 int modu = 700;
 
-bool ANIMATE = false;
+bool ANIMATE = true;
+bool SSAO = true;
 
 void draw_bolt(lightning_seg *start, GLfloat t, int d) {
 	if((int)t % modu <= 50 && (int)prevt % modu > (int)t % modu && ANIMATE) {
@@ -278,17 +279,22 @@ float rand_float() {
 }
 
 void gen_samples() {
+	vec3 sample;
 	for(int i = 0; i < 64; ++i) {
-		vec3 sample = vec3(rand_float() * 2.0 - 1.0, rand_float() * 2.0 - 1.0, rand_float());
+		bool ok = false;
+		while(!ok) {
+			sample = vec3(rand_float() * 2.0 - 1.0, rand_float() * 2.0 - 1.0, rand_float());
+			if(dot(sample, vec3(0.0, 0.0, 1.0)) > 0.9)
+				ok = true;
+		}
 		sample = normalize(sample);
 		sample *= rand_float();
-		sample *= 0.0001;
 
-		// float scale = float(i) / 64.0;
+		float scale = float(i) / 64.0;
 
 		
-		// scale = 0.1 + scale * scale * (1.0 - 0.1);
-		// sample *= scale;
+		scale = 0.5 + scale * scale * (1.0 - 0.5);
+		sample *= scale;
 		samples[i] = sample;
 		printVec3(sample);
 	}
@@ -296,12 +302,24 @@ void gen_samples() {
 
 //-------------------------------------------------------------------------------------
 
+int count;
+
 void init(void)
 {
 	std::cout << "enter seed: ";
 	int seed;
 	std::cin >> seed;
 	std::srand(seed);
+
+	std::cout << "animate? (y/n): ";
+	char yn_anim;
+	std::cin >> yn_anim;
+	ANIMATE = (yn_anim == 'y');
+
+	std::cout << "ssao? (y/n): ";
+	char yn_ssao;
+	std::cin >> yn_ssao;
+	SSAO = (yn_ssao == 'y');
 
 	sl = new lightning_seg;
 
@@ -325,14 +343,14 @@ void init(void)
 	// Load and compile shaders
 	plaintextureshader = loadShaders("plaintextureshader.vert", "plaintextureshader.frag");  // puts texture on teapot
 	phongshader = loadShaders("phong.vert", "phong.frag");  // renders with light (used for initial renderin of teapot)
-	ssaoshader = loadShaders("phong.vert", "ssao.frag");  // renders with light (used for initial renderin of teapot)
+	ssaoshader = loadShaders("plaintextureshader.vert", "ssao.frag");  // renders with light (used for initial renderin of teapot)
 	depthshader = loadShaders("phong.vert", "depth.frag");  // renders with light (used for initial renderin of teapot)
 	normalshader = loadShaders("phong.vert", "normal.frag");  // renders with light (used for initial renderin of teapot)
 	litshader = loadShaders("phong.vert", "lit.frag");  // renders with light (used for initial renderin of teapot)
 	lowpassshader = loadShaders("plaintextureshader.vert", "lowpass.frag");
 	truncateshader = loadShaders("plaintextureshader.vert", "truncate.frag");
 	addfiltershader = loadShaders("plaintextureshader.vert", "addfilter.frag");
-	addfiltershader = loadShaders("plaintextureshader.vert", "multfilter.frag");
+	multfiltershader = loadShaders("plaintextureshader.vert", "multfilter.frag");
 
 	printError("init shader");
 
@@ -370,193 +388,241 @@ void display(void)
 	//  a new frame; due to the idle()-function below, this
 	//  function will get called several times per second
 
+	if(SSAO) {
+		// ---------- calc depth fbo
+		useFBO(fbo3, 0L, 0L);
+
+		// Clear framebuffer & zbuffer
+		glClearColor(0.1, 0.1, 0.3, 0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		
+		glUseProgram(depthshader);
+		
+		vm2 = viewMatrix * modelToWorldMatrix;
+		vm2 = vm2 * T(0, -8.5, 0);
+		vm2 = vm2 * S(80,80,80);
+
+		glUniformMatrix4fv(glGetUniformLocation(depthshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
+		glUniformMatrix4fv(glGetUniformLocation(depthshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
+
+		// glUniform1i(glGetUniformLocation(depthshader, "texUnit"), 0);
+
+		// Enable Z-buffering
+		glEnable(GL_DEPTH_TEST);
+		// Enable backface culling
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_BACK);
+
+
+		DrawModel(floor_Model, depthshader, "in_Position", NULL, NULL);
+
+		vm2 = viewMatrix * modelToWorldMatrix;
+		vm2 = vm2 * T(0, -8.5, 0);
+		vm2 = vm2 * T(20.0, -35.0, 5.0);
+		vm2 = vm2 * S(80,80,80);
+		glUniformMatrix4fv(glGetUniformLocation(depthshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
+		DrawModel(model1, depthshader, "in_Position", NULL, NULL);
+
+		// ---------- calc normal fbo
+		useFBO(fbo1, 0L, 0L);
+
+		// Clear framebuffer & zbuffer
+		glClearColor(0.1, 0.1, 0.3, 0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		
+		glUseProgram(normalshader);
+		
+		vm2 = viewMatrix * modelToWorldMatrix;
+		vm2 = vm2 * T(0, -8.5, 0);
+		vm2 = vm2 * S(80,80,80);
+
+		glUniformMatrix4fv(glGetUniformLocation(normalshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
+		glUniformMatrix4fv(glGetUniformLocation(normalshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
+
+		// glUniform1i(glGetUniformLocation(normalshader, "texUnit"), 0);
+
+		// Enable Z-buffering
+		glEnable(GL_DEPTH_TEST);
+		// Enable backface culling
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_BACK);
+
+
+		DrawModel(floor_Model, normalshader, "in_Position", "in_Normal", NULL);
+
+		vm2 = viewMatrix * modelToWorldMatrix;
+		vm2 = vm2 * T(0, -8.5, 0);
+		vm2 = vm2 * T(20.0, -35.0, 5.0);
+		vm2 = vm2 * S(80,80,80);
+		glUniformMatrix4fv(glGetUniformLocation(normalshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
+		DrawModel(model1, normalshader, "in_Position", "in_Normal", NULL);
+
+		// ---------- create ssao
+		useFBO(fbo2, fbo3, fbo1);
+
+		// Clear framebuffer & zbuffer
+		glClearColor(0.1, 0.1, 0.3, 0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		
+		glUseProgram(ssaoshader);
+		
+		glUniform3fv(glGetUniformLocation(ssaoshader, "samples"), 64 * 3, (GLfloat *)samples);
+
+		glUniformMatrix4fv(glGetUniformLocation(ssaoshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
+
+		glUniform1i(glGetUniformLocation(ssaoshader, "texUnit"), 0);
+		glUniform1i(glGetUniformLocation(ssaoshader, "texUnit2"), 1);
+		
+		glDisable(GL_CULL_FACE);
+		glDisable(GL_DEPTH_TEST);
+		DrawModel(squareModel, ssaoshader, "in_Position", NULL, "in_TexCoord");
+		
+		// ---------- blur shading
+		count = 20;
+		for (int i = 0; i < count; i++) {
+			runfilter(lowpassshader, fbo2, 0L, fbo1);
+			runfilter(lowpassshader, fbo1, 0L, fbo2);
+		}
+	}
+
+	// ---------- calc light
 	useFBO(fbo3, 0L, 0L);
 
 	// Clear framebuffer & zbuffer
 	glClearColor(0.1, 0.1, 0.3, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
-	glUseProgram(depthshader);
+	// Activate shader program
+	glUseProgram(phongshader);
 	
 	vm2 = viewMatrix * modelToWorldMatrix;
 	vm2 = vm2 * T(0, -8.5, 0);
 	vm2 = vm2 * S(80,80,80);
 
-	glUniformMatrix4fv(glGetUniformLocation(depthshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
-	glUniformMatrix4fv(glGetUniformLocation(depthshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
+	glUniform3fv(glGetUniformLocation(phongshader, "lights"), 70 * 3, (GLfloat *)lights);
+	int tmp = num_lights;
+	glUniform1i(glGetUniformLocation(phongshader, "num_lights"), tmp);
 
-	glUniform1i(glGetUniformLocation(depthshader, "texUnit"), 0);
-
-	// Enable Z-buffering
-	glEnable(GL_DEPTH_TEST);
-	// Enable backface culling
-	glEnable(GL_CULL_FACE);
-	glCullFace(GL_BACK);
-
-
-	DrawModel(floor_Model, depthshader, "in_Position", NULL, NULL);
-	// DrawModel(floor_Model, depthshader, "in_Position", "in_Normal", NULL);
-
-	vm2 = viewMatrix * modelToWorldMatrix;
-	vm2 = vm2 * T(0, -8.5, 0);
-	vm2 = vm2 * T(20.0, -35.0, 5.0);
-	vm2 = vm2 * S(80,80,80);
-	glUniformMatrix4fv(glGetUniformLocation(depthshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
-	DrawModel(model1, depthshader, "in_Position", NULL, NULL);
-	// DrawModel(model1, depthshader, "in_Position", "in_Normal", NULL);
-
-	useFBO(fbo1, 0L, 0L);
-
-	// Clear framebuffer & zbuffer
-	glClearColor(0.1, 0.1, 0.3, 0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	
-	glUseProgram(normalshader);
-	
-	vm2 = viewMatrix * modelToWorldMatrix;
-	vm2 = vm2 * T(0, -8.5, 0);
-	vm2 = vm2 * S(80,80,80);
-
-	glUniformMatrix4fv(glGetUniformLocation(normalshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
-	glUniformMatrix4fv(glGetUniformLocation(normalshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
-
-	glUniform1i(glGetUniformLocation(normalshader, "texUnit"), 0);
-
-	// Enable Z-buffering
-	glEnable(GL_DEPTH_TEST);
-	// Enable backface culling
-	glEnable(GL_CULL_FACE);
-	glCullFace(GL_BACK);
-
-
-	DrawModel(floor_Model, normalshader, "in_Position", NULL, NULL);
-
-	vm2 = viewMatrix * modelToWorldMatrix;
-	vm2 = vm2 * T(0, -8.5, 0);
-	vm2 = vm2 * T(20.0, -35.0, 5.0);
-	vm2 = vm2 * S(80,80,80);
-	glUniformMatrix4fv(glGetUniformLocation(normalshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
-	DrawModel(model1, normalshader, "in_Position", NULL, NULL);
-
-	useFBO(fbo2, fbo3, fbo1);
-
-	// Clear framebuffer & zbuffer
-	glClearColor(0.1, 0.1, 0.3, 0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	
-	glUseProgram(ssaoshader);
-	
-	glUniform3fv(glGetUniformLocation(phongshader, "samples"), 64 * 3, (GLfloat *)samples);
-	
-	vm2 = viewMatrix * modelToWorldMatrix;
-	vm2 = vm2 * T(0, -8.5, 0);
-	vm2 = vm2 * S(80,80,80);
-
-	glUniformMatrix4fv(glGetUniformLocation(ssaoshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
-	glUniformMatrix4fv(glGetUniformLocation(ssaoshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
-
-	glUniform1i(glGetUniformLocation(ssaoshader, "texUnit"), 0);
- 	glUniform1i(glGetUniformLocation(ssaoshader, "texUnit2"), 1);
-
-	// Enable Z-buffering
-	glEnable(GL_DEPTH_TEST);
-	// Enable backface culling
-	glEnable(GL_CULL_FACE);
-	glCullFace(GL_BACK);
-
-	DrawModel(floor_Model, ssaoshader, "in_Position", NULL, NULL);
-	// DrawModel(floor_Model, ssaoshader, "in_Position", "in_Normal", NULL);
-
-	vm2 = viewMatrix * modelToWorldMatrix;
-	vm2 = vm2 * T(0, -8.5, 0);
-	vm2 = vm2 * T(20.0, -35.0, 5.0);
-	vm2 = vm2 * S(80,80,80);
-	glUniformMatrix4fv(glGetUniformLocation(ssaoshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
-	DrawModel(model1, ssaoshader, "in_Position", NULL, NULL);
-	// DrawModel(model1, ssaoshader, "in_Position", "in_Normal", NULL);
-
-	
-	// glUseProgram(litshader);
-
-	// vm2 = viewMatrix * modelToWorldMatrix;
-	// vm2 = vm2 * T(0, -8.5, 0);
-	// vm2 = vm2 * S(80,80,80);
-
-	// glUniformMatrix4fv(glGetUniformLocation(litshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
-	// glUniformMatrix4fv(glGetUniformLocation(litshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
-
-	// glUniform1i(glGetUniformLocation(litshader, "texUnit"), 0);
-
-	// // Enable Z-buffering
-	// glEnable(GL_DEPTH_TEST);
-	// // Enable backface culling
-	// glEnable(GL_CULL_FACE);
-	// glCullFace(GL_BACK);
-
-	// num_lights = 0;
-	// draw_bolt(sl, t, 0);
-
-	// for(int i = 0; i < num_lights; i++) {
-	// 	vm3 = viewMatrix * modelToWorldMatrix;
-	// 	vm3 = vm3 * T(0, -8.5, 0);
-	// 	vm3 = vm3 * S(80,80,80);
-	// 	vm3 = vm3 * T(lights[i].x, lights[i].y, lights[i].z);
-	// 	lights[i] =  vec3(vm3 * vec4(lights[i], 1.0));
-	// 	glUniformMatrix4fv(glGetUniformLocation(litshader, "modelviewMatrix"), 1, GL_TRUE, vm3.m);
-	// }
-
-	// // Activate shader program
-	// glUseProgram(phongshader);
-
-	// glUniform3fv(glGetUniformLocation(phongshader, "lights"), 70 * 3, (GLfloat *)lights);
-	// int tmp = num_lights;
-	// glUniform1i(glGetUniformLocation(phongshader, "num_lights"), tmp);
-
-	// glUniformMatrix4fv(glGetUniformLocation(phongshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
-	// glUniformMatrix4fv(glGetUniformLocation(phongshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
+	glUniformMatrix4fv(glGetUniformLocation(phongshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
+	glUniformMatrix4fv(glGetUniformLocation(phongshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
 
 	// glUniform1i(glGetUniformLocation(phongshader, "texUnit"), 0);
 
-	// // Enable Z-buffering
-	// glEnable(GL_DEPTH_TEST);
-	// // Enable backface culling
+	// Enable Z-buffering
+	glEnable(GL_DEPTH_TEST);
+	// Enable backface culling
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
+
+	DrawModel(floor_Model, phongshader, "in_Position", "in_Normal", NULL);
+
+	vm2 = viewMatrix * modelToWorldMatrix;
+	vm2 = vm2 * T(0, -8.5, 0);
+	vm2 = vm2 * T(20.0, -35.0, 5.0);
+	vm2 = vm2 * S(80,80,80);
+	glUniformMatrix4fv(glGetUniformLocation(phongshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
+	DrawModel(model1, phongshader, "in_Position", "in_Normal", NULL);
+	
+	if(SSAO) {
+		// ---------- add shading and light together
+		useFBO(fbo1, fbo2, fbo3);
+		glClearColor(0.0, 0.0, 0.0, 0.0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		glUseProgram(multfiltershader);
+
+		glUniform1i(glGetUniformLocation(multfiltershader, "texUnit"), 0);
+		glUniform1i(glGetUniformLocation(multfiltershader, "texUnit2"), 1);
+
+		glDisable(GL_CULL_FACE);
+		glDisable(GL_DEPTH_TEST);
+		DrawModel(squareModel, multfiltershader, "in_Position", NULL, "in_TexCoord");
+	} else {
+		useFBO(fbo1, fbo3, 0L);
+		glClearColor(0.0, 0.0, 0.0, 0.0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		glUseProgram(plaintextureshader);
+
+		glUniform1i(glGetUniformLocation(plaintextureshader, "texUnit"), 0);
+
+		glDisable(GL_CULL_FACE);
+		glDisable(GL_DEPTH_TEST);
+		DrawModel(squareModel, plaintextureshader, "in_Position", NULL, "in_TexCoord");
+	}
+
+
+	// ---------- lightning bolt
+	useFBO(fbo3, 0L, 0L);
+	glClearColor(0.0, 0.0, 0.0, 0);
+	glClear(GL_COLOR_BUFFER_BIT); // Do not clear the z-buffer, we care if bunny is in front of lightning
+
+	glUseProgram(litshader);
+
+	vm2 = viewMatrix * modelToWorldMatrix;
+	vm2 = vm2 * T(0, -8.5, 0);
+	vm2 = vm2 * S(80,80,80);
+
+	glUniformMatrix4fv(glGetUniformLocation(litshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
+	glUniformMatrix4fv(glGetUniformLocation(litshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
+
+	// glUniform1i(glGetUniformLocation(litshader, "texUnit"), 0);
+
+	// Enable Z-buffering
+	glEnable(GL_DEPTH_TEST);
+	// Enable backface culling
 	// glEnable(GL_CULL_FACE);
 	// glCullFace(GL_BACK);
 
-	// DrawModel(floor_Model, phongshader, "in_Position", "in_Normal", NULL);
+	num_lights = 0;
+	draw_bolt(sl, t, 0);
 
-	// vm2 = viewMatrix * modelToWorldMatrix;
-	// vm2 = vm2 * T(0, -8.5, 0);
-	// vm2 = vm2 * T(20.0, -35.0, 5.0);
-	// vm2 = vm2 * S(80,80,80);
-	// glUniformMatrix4fv(glGetUniformLocation(phongshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
-	// DrawModel(model1, phongshader, "in_Position", "in_Normal", NULL);
-
-	// runfilter(truncateshader, fbo3, 0L, fbo2);
-
-	// int count = 100;
-	// for (int i = 0; i < count; i++) {
-	// 	runfilter(lowpassshader, fbo2, 0L, fbo1);
-	// 	runfilter(lowpassshader, fbo1, 0L, fbo2);
-	// }
-
-	// // Done rendering the FBO! Set up for rendering on screen, using the result as texture!
-
-	// useFBO(0L, fbo2, fbo3);
-	useFBO(0L, fbo2, 0L);
-	glClearColor(0.0, 0.0, 0.0, 0);
+	for(int i = 0; i < num_lights; i++) {
+		vm3 = viewMatrix * modelToWorldMatrix;
+		vm3 = vm3 * T(0, -8.5, 0);
+		vm3 = vm3 * S(80,80,80);
+		vm3 = vm3 * T(lights[i].x, lights[i].y, lights[i].z);
+		lights[i] =  vec3(vm3 * vec4(lights[i], 1.0));
+		glUniformMatrix4fv(glGetUniformLocation(litshader, "modelviewMatrix"), 1, GL_TRUE, vm3.m);
+	}
+	
+	// ---------- add lighting bolt to scene
+	useFBO(fbo2, fbo3, fbo1);
+	glClearColor(0.0, 0.0, 0.0, 0.0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	// // Activate second shader program
-	glUseProgram(plaintextureshader);
+	glUseProgram(addfiltershader);
 
-	glUniform1i(glGetUniformLocation(plaintextureshader, "texUnit"), 0);
- 	// glUniform1i(glGetUniformLocation(multfiltershader, "texUnit2"), 1);
+	glUniform1i(glGetUniformLocation(addfiltershader, "texUnit"), 0);
+	glUniform1i(glGetUniformLocation(addfiltershader, "texUnit2"), 1);
 
 	glDisable(GL_CULL_FACE);
 	glDisable(GL_DEPTH_TEST);
-	DrawModel(squareModel, plaintextureshader, "in_Position", NULL, "in_TexCoord");
+	DrawModel(squareModel, addfiltershader, "in_Position", NULL, "in_TexCoord");
 
+	// ---------- blur bolt
+	runfilter(truncateshader, fbo3, 0L, fbo1);
+
+	count = 100;
+	for (int i = 0; i < count; i++) {
+		runfilter(lowpassshader, fbo3, 0L, fbo1);
+	 	runfilter(lowpassshader, fbo1, 0L, fbo3);
+	}
+
+	// ---------- add lighting bolt to scene
+	useFBO(0L, fbo2, fbo3);
+	glClearColor(0.0, 0.0, 0.0, 0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glUseProgram(addfiltershader);
+
+	glUniform1i(glGetUniformLocation(addfiltershader, "texUnit"), 0);
+	glUniform1i(glGetUniformLocation(addfiltershader, "texUnit2"), 1);
+
+	glDisable(GL_CULL_FACE);
+	glDisable(GL_DEPTH_TEST);
+	DrawModel(squareModel, addfiltershader, "in_Position", NULL, "in_TexCoord");
+	
 	glutSwapBuffers();
 }
 
