@@ -25,7 +25,7 @@ uniform int num_lights;
 void main(void)
 {
 	float diffuse, specular;
-	float shade = 0.0;
+	float shade = 0.1;
 	for(int i = 0; i < num_lights; i++) {
 		// vec3 light = vec3(modelviewMatrix * vec4(lights[i], 1.0)); // Given in VIEW coordinates! You usually specify light sources in world coordinates.
 		vec3 light = normalize(lights[i] - exSurface); // Given in VIEW coordinates! You usually specify light sources in world coordinates.

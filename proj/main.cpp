@@ -186,10 +186,10 @@ GLuint squareIndices[] = {0, 1, 2, 0, 2, 3};
 Model* squareModel;
 
 GLfloat floor_[] = {
-							-1000,-5 * scale,-1000,
-							-1000,-5 * scale, 1000,
-							1000,-5 * scale, 1000,
-							1000,-5 * scale, -1000};
+							-10,-5 * scale,-10,
+							-10,-5 * scale, 10,
+							10,-5 * scale, 10,
+							10,-5 * scale, -10};
 GLfloat floor_Normals[] = {
 							0,1,0,
 							0,1,0,
@@ -202,7 +202,7 @@ Model* floor_Model;
 
 //----------------------Globals-------------------------------------------------
 Model *model1;
-FBOstruct *fbo1, *fbo2, *fbo3;
+FBOstruct *fbo1, *fbo2, *fbo3, *fbo4;
 GLuint depthshader = 0, normalshader = 0, ssaoshader = 0, phongshader = 0, litshader = 0, plaintextureshader = 0, lowpassshader = 0, truncateshader = 0, addfiltershader = 0, multfiltershader = 0;
 
 void runfilter(GLuint shader, FBOstruct *in1, FBOstruct *in2, FBOstruct *out)
@@ -228,7 +228,7 @@ GLfloat prevt = 0;
 vec3 lights[70 * 3];
 int num_lights = 0;
 
-vec3 samples[64];
+vec3 samples[200];
 
 int mul = 15;
 int modu = 700;
@@ -236,8 +236,8 @@ int modu = 700;
 bool ANIMATE = true;
 bool SSAO = true;
 
-void draw_bolt(lightning_seg *start, GLfloat t, int d) {
-	if((int)t % modu <= 50 && (int)prevt % modu > (int)t % modu && ANIMATE) {
+void draw_bolt(lightning_seg *start, GLfloat t, int d, bool counting) {
+	if((int)t % modu <= 50 && (int)prevt % modu > (int)t % modu && ANIMATE && counting) {
 		delete_lightning(sl);
 		sl = new lightning_seg;
 
@@ -252,7 +252,8 @@ void draw_bolt(lightning_seg *start, GLfloat t, int d) {
 		return;
 	}
 
-	DrawModel(start->m, litshader, "in_Position", NULL, NULL);
+	if(!counting)
+		DrawModel(start->m, litshader, "in_Position", NULL, NULL);
 	lights[num_lights] = start->light;
 	num_lights++;
 	lights[num_lights] = start->start * scale;
@@ -266,7 +267,7 @@ void draw_bolt(lightning_seg *start, GLfloat t, int d) {
 				std::cout << "oh no" << std::endl;
 				return;
 			}
-			draw_bolt(start->children[i], t, d + 1);
+			draw_bolt(start->children[i], t, d + 1, counting);
 		}
 	}
 
@@ -275,34 +276,35 @@ void draw_bolt(lightning_seg *start, GLfloat t, int d) {
 
 float rand_float() {
 	int ran = std::rand();
-	return (float(ran % 10000) / 10000);
+	return (float(ran % 1000000) / 1000000);
 }
 
 void gen_samples() {
 	vec3 sample;
-	for(int i = 0; i < 64; ++i) {
+	for(int i = 0; i < 200; ++i) {
 		bool ok = false;
 		while(!ok) {
 			sample = vec3(rand_float() * 2.0 - 1.0, rand_float() * 2.0 - 1.0, rand_float());
-			if(dot(sample, vec3(0.0, 0.0, 1.0)) > 0.9)
+			// if(dot(sample, vec3(0.0, 0.0, 1.0)) > 0.1)
 				ok = true;
 		}
 		sample = normalize(sample);
 		sample *= rand_float();
 
-		float scale = float(i) / 64.0;
+		float scale = float(i) / 200.0;
 
 		
-		scale = 0.5 + scale * scale * (1.0 - 0.5);
+		scale = 0.2 + scale * scale * (1.0 - 0.2);
 		sample *= scale;
 		samples[i] = sample;
-		printVec3(sample);
 	}
 }
 
 //-------------------------------------------------------------------------------------
 
 int count;
+
+unsigned int noiseTexture; 
 
 void init(void)
 {
@@ -331,6 +333,22 @@ void init(void)
 
 	gen_samples();
 
+	std::vector<vec3> noise_tex;
+	vec3 noise;
+	int noiseW = 100;
+	for(int i = 0; i < noiseW * noiseW; i++) {
+		noise = vec3(rand_float() * 2.0 - 1.0, rand_float() * 2.0 - 1.0, 0.0);
+		noise_tex.push_back(noise);
+	}
+
+	glGenTextures(1, &noiseTexture);
+    glBindTexture(GL_TEXTURE_2D, noiseTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, noiseW, noiseW, 0, GL_RGB, GL_FLOAT, &noise_tex[0]);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
 	dumpInfo();  // shader info
 
 	// GL inits
@@ -357,6 +375,7 @@ void init(void)
 	fbo1 = initFBO(W, H, 0);
 	fbo2 = initFBO(W, H, 0);
 	fbo3 = initFBO(W, H, 0);
+	fbo4 = initFBO(W, H, 0);
 
 	// load the model
 	model1 = LoadModelPlus("stanford-bunny.obj");
@@ -405,8 +424,6 @@ void display(void)
 		glUniformMatrix4fv(glGetUniformLocation(depthshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
 		glUniformMatrix4fv(glGetUniformLocation(depthshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
 
-		// glUniform1i(glGetUniformLocation(depthshader, "texUnit"), 0);
-
 		// Enable Z-buffering
 		glEnable(GL_DEPTH_TEST);
 		// Enable backface culling
@@ -439,8 +456,6 @@ void display(void)
 		glUniformMatrix4fv(glGetUniformLocation(normalshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
 		glUniformMatrix4fv(glGetUniformLocation(normalshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
 
-		// glUniform1i(glGetUniformLocation(normalshader, "texUnit"), 0);
-
 		// Enable Z-buffering
 		glEnable(GL_DEPTH_TEST);
 		// Enable backface culling
@@ -466,19 +481,20 @@ void display(void)
 		
 		glUseProgram(ssaoshader);
 		
-		glUniform3fv(glGetUniformLocation(ssaoshader, "samples"), 64 * 3, (GLfloat *)samples);
+		glUniform3fv(glGetUniformLocation(ssaoshader, "samples"), 200 * 3, (GLfloat *)samples);
 
 		glUniformMatrix4fv(glGetUniformLocation(ssaoshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
 
 		glUniform1i(glGetUniformLocation(ssaoshader, "texUnit"), 0);
 		glUniform1i(glGetUniformLocation(ssaoshader, "texUnit2"), 1);
+		glUniform1i(glGetUniformLocation(ssaoshader, "texUnit3"), noiseTexture);
 		
 		glDisable(GL_CULL_FACE);
 		glDisable(GL_DEPTH_TEST);
 		DrawModel(squareModel, ssaoshader, "in_Position", NULL, "in_TexCoord");
 		
 		// ---------- blur shading
-		count = 20;
+		count = 10;
 		for (int i = 0; i < count; i++) {
 			runfilter(lowpassshader, fbo2, 0L, fbo1);
 			runfilter(lowpassshader, fbo1, 0L, fbo2);
@@ -498,6 +514,17 @@ void display(void)
 	vm2 = viewMatrix * modelToWorldMatrix;
 	vm2 = vm2 * T(0, -8.5, 0);
 	vm2 = vm2 * S(80,80,80);
+	
+	num_lights = 0;
+	draw_bolt(sl, t, 0, true);
+
+	for(int i = 0; i < num_lights; i++) {
+		vm3 = viewMatrix * modelToWorldMatrix;
+		vm3 = vm3 * T(0, -8.5, 0);
+		vm3 = vm3 * S(80,80,80);
+		vm3 = vm3 * T(lights[i].x, lights[i].y, lights[i].z);
+		lights[i] =  vec3(vm3 * vec4(lights[i], 1.0));
+	}
 
 	glUniform3fv(glGetUniformLocation(phongshader, "lights"), 70 * 3, (GLfloat *)lights);
 	int tmp = num_lights;
@@ -505,8 +532,6 @@ void display(void)
 
 	glUniformMatrix4fv(glGetUniformLocation(phongshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
 	glUniformMatrix4fv(glGetUniformLocation(phongshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
-
-	// glUniform1i(glGetUniformLocation(phongshader, "texUnit"), 0);
 
 	// Enable Z-buffering
 	glEnable(GL_DEPTH_TEST);
@@ -566,25 +591,11 @@ void display(void)
 	glUniformMatrix4fv(glGetUniformLocation(litshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
 	glUniformMatrix4fv(glGetUniformLocation(litshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
 
-	// glUniform1i(glGetUniformLocation(litshader, "texUnit"), 0);
-
 	// Enable Z-buffering
 	glEnable(GL_DEPTH_TEST);
-	// Enable backface culling
-	// glEnable(GL_CULL_FACE);
-	// glCullFace(GL_BACK);
 
 	num_lights = 0;
-	draw_bolt(sl, t, 0);
-
-	for(int i = 0; i < num_lights; i++) {
-		vm3 = viewMatrix * modelToWorldMatrix;
-		vm3 = vm3 * T(0, -8.5, 0);
-		vm3 = vm3 * S(80,80,80);
-		vm3 = vm3 * T(lights[i].x, lights[i].y, lights[i].z);
-		lights[i] =  vec3(vm3 * vec4(lights[i], 1.0));
-		glUniformMatrix4fv(glGetUniformLocation(litshader, "modelviewMatrix"), 1, GL_TRUE, vm3.m);
-	}
+	draw_bolt(sl, t, 0, false);
 	
 	// ---------- add lighting bolt to scene
 	useFBO(fbo2, fbo3, fbo1);
