@@ -282,14 +282,19 @@ float rand_float() {
 void gen_samples() {
 	vec3 sample;
 	for(int i = 0; i < 200; ++i) {
-		if(i % 4 == 0) {
-			sample = vec3(- rand_float(), -rand_float(), rand_float());
-		} else if(i % 4 == 1){
-			sample = vec3(- rand_float(), rand_float(), rand_float());
-		} else if(i % 4 == 2){
-			sample = vec3(rand_float(), -rand_float(), rand_float());
-		} else {
-			sample = vec3(rand_float(), rand_float(), rand_float());
+		bool ok = false;
+		while(!ok) {
+			if(i % 4 == 0) {
+		    	sample = vec3(- rand_float(), -rand_float(), rand_float());
+		    } else if(i % 4 == 1){
+		    	sample = vec3(- rand_float(), rand_float(), rand_float());
+		    } else if(i % 4 == 2){
+		    	sample = vec3(rand_float(), -rand_float(), rand_float());
+		    } else {
+		    	sample = vec3(rand_float(), rand_float(), rand_float());
+		    }
+			if(dot(sample, vec3(0.0, 0.0, 1.0)) > 0.01)
+				ok = true;
 		}
 		sample = normalize(sample);
 		sample *= rand_float();
@@ -338,11 +343,16 @@ void init(void)
 
 	std::vector<vec3> noise_tex;
 	vec3 noise;
-	int noiseW = 100;
+	int noiseW = 5;
 	for(int i = 0; i < noiseW * noiseW; i++) {
 		noise = vec3(rand_float() * 2.0 - 1.0, rand_float() * 2.0 - 1.0, 0.0);
 		noise_tex.push_back(noise);
 	}
+
+	fbo1 = initFBO(W, H, 0);
+	fbo2 = initFBO(W, H, 0);
+	fbo3 = initFBO(W, H, 0);
+	fbo4 = initFBO(W, H, 0);
 
 	glGenTextures(1, &noiseTexture);
     glBindTexture(GL_TEXTURE_2D, noiseTexture);
@@ -375,10 +385,6 @@ void init(void)
 
 	printError("init shader");
 
-	fbo1 = initFBO(W, H, 0);
-	fbo2 = initFBO(W, H, 0);
-	fbo3 = initFBO(W, H, 0);
-	fbo4 = initFBO(W, H, 0);
 
 	// load the model
 	model1 = LoadModelPlus("stanford-bunny.obj");
@@ -438,7 +444,7 @@ void display(void)
 
 		vm2 = viewMatrix * modelToWorldMatrix;
 		vm2 = vm2 * T(0, -8.5, 0);
-		vm2 = vm2 * T(20.0, -36.0, 5.0);
+		vm2 = vm2 * T(20.0, -35.0, 5.0);
 		vm2 = vm2 * S(80,80,80);
 		glUniformMatrix4fv(glGetUniformLocation(depthshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
 		DrawModel(model1, depthshader, "in_Position", NULL, NULL);
@@ -470,13 +476,13 @@ void display(void)
 
 		vm2 = viewMatrix * modelToWorldMatrix;
 		vm2 = vm2 * T(0, -8.5, 0);
-		vm2 = vm2 * T(20.0, -36.0, 5.0);
+		vm2 = vm2 * T(20.0, -35.0, 5.0);
 		vm2 = vm2 * S(80,80,80);
 		glUniformMatrix4fv(glGetUniformLocation(normalshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
 		DrawModel(model1, normalshader, "in_Position", "in_Normal", NULL);
 
 		// ---------- create ssao
-		useFBO(0L, fbo3, fbo1);
+		useFBO(fbo2, fbo3, fbo1);
 
 		// Clear framebuffer & zbuffer
 		glClearColor(0.1, 0.1, 0.3, 0);
@@ -547,7 +553,7 @@ void display(void)
 
 	vm2 = viewMatrix * modelToWorldMatrix;
 	vm2 = vm2 * T(0, -8.5, 0);
-	vm2 = vm2 * T(20.0, -36.0, 5.0);
+	vm2 = vm2 * T(20.0, -35.0, 5.0);
 	vm2 = vm2 * S(80,80,80);
 	glUniformMatrix4fv(glGetUniformLocation(phongshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
 	DrawModel(model1, phongshader, "in_Position", "in_Normal", NULL);
@@ -625,7 +631,7 @@ void display(void)
 	}
 
 	// ---------- add lighting bolt to scene
-	useFBO(fbo1, fbo2, fbo3);
+	useFBO(0L, fbo2, fbo3);
 	glClearColor(0.0, 0.0, 0.0, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 

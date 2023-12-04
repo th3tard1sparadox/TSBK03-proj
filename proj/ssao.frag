@@ -17,14 +17,15 @@ void main(void)
 	int tot = 200;
 	float radius = 0.5;
 	float bias = 0.025;
+	vec2 nScale = vec2(512.0/10.0);
 
 	vec3 pos = texture(texUnit, outTexCoord).xyz;
-	vec3 norm = normalize(texture(texUnit2, outTexCoord).xyz);
-	vec3 randVec = normalize(texture(texUnit3, outTexCoord).xyz);
+	vec3 norm = normalize(2.0 * texture(texUnit2, outTexCoord).xyz - vec3(1.0));
+	vec3 randVec = normalize(2.0 * texture(texUnit3, outTexCoord * nScale).xyz - vec3(1.0, 1.0, 0.0));
 	vec3 worldPos = (inverse(viewMatrix) * vec4(pos, 1.0)).xyz;
 
 	vec3 tang = normalize(randVec - norm * dot(randVec, norm));
-	vec3 bitang = cross(norm, tang);
+	vec3 bitang = normalize(cross(norm, tang));
 	mat3 TBN = mat3(tang, bitang, norm);
 
 	vec3 samPos;
