@@ -504,7 +504,7 @@ void display(void)
 		DrawModel(squareModel, ssaoshader, "in_Position", NULL, "in_TexCoord");
 		
 		// ---------- blur shading
-		count = 10;
+		count = 5;
 		for (int i = 0; i < count; i++) {
 			runfilter(lowpassshader, fbo2, 0L, fbo1);
 			runfilter(lowpassshader, fbo1, 0L, fbo2);
@@ -630,7 +630,7 @@ void display(void)
 	 	runfilter(lowpassshader, fbo1, 0L, fbo3);
 	}
 
-	// ---------- add lighting bolt to scene
+	// ---------- add lighting bolt blur to scene
 	useFBO(0L, fbo2, fbo3);
 	glClearColor(0.0, 0.0, 0.0, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

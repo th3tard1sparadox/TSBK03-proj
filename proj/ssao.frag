@@ -57,8 +57,10 @@ float approxshade() {
 	vec3 coord1;
 	vec3 coord2;
 	float diff = 0.0;
-	float cutoff = 0.8;
-	for(int i = 1; i < 4; i++) {
+	float cutoff = 1.5;
+	float div = 10.0;
+	int range = 5;
+	for(int i = 1; i < range + 1; i++) {
 		coord1 = vec3(outTexCoord.x + float(i) / 512.0, outTexCoord.y, 0.0);
 		coord2 = vec3(outTexCoord.x - float(i) / 512.0, outTexCoord.y, 0.0);
 		if(coord1.x >= 0.0 && coord2.x >= 0.0 && coord1.x <= 1.0 && coord2.x <= 1.0 &&
@@ -70,7 +72,7 @@ float approxshade() {
 				diff += pos.z - expectz;
 		}
 	}
-	for(int i = 1; i < 4; i++) {
+	for(int i = 1; i < range + 1; i++) {
 		coord1 = vec3(outTexCoord.x, outTexCoord.y + float(i) / 512.0, 0.0);
 		coord2 = vec3(outTexCoord.x, outTexCoord.y - float(i) / 512.0, 0.0);
 		if(coord1.x >= 0.0 && coord2.x >= 0.0 && coord1.x <= 1.0 && coord2.x <= 1.0 &&
@@ -82,7 +84,7 @@ float approxshade() {
 				diff += pos.z - expectz;
 		}
 	}
-	for(int i = 1; i < 4; i++) {
+	for(int i = 1; i < range + 1; i++) {
 		coord1 = vec3(outTexCoord.x + float(i) / 512.0, outTexCoord.y + float(i) / 512.0, 0.0);
 		coord2 = vec3(outTexCoord.x - float(i) / 512.0, outTexCoord.y - float(i) / 512.0, 0.0);
 		if(coord1.x >= 0.0 && coord2.x >= 0.0 && coord1.x <= 1.0 && coord2.x <= 1.0 &&
@@ -94,7 +96,7 @@ float approxshade() {
 				diff += pos.z - expectz;
 		}
 	}
-	for(int i = 1; i < 4; i++) {
+	for(int i = 1; i < range + 1; i++) {
 		coord1 = vec3(outTexCoord.x + float(i) / 512.0, outTexCoord.y - float(i) / 512.0, 0.0);
 		coord2 = vec3(outTexCoord.x - float(i) / 512.0, outTexCoord.y + float(i) / 512.0, 0.0);
 		if(coord1.x >= 0.0 && coord2.x >= 0.0 && coord1.x <= 1.0 && coord2.x <= 1.0 &&
