@@ -590,7 +590,7 @@ void display(void)
 	// ---------- lightning bolt
 	useFBO(fbo3, 0L, 0L);
 	glClearColor(0.0, 0.0, 0.0, 0);
-	glClear(GL_COLOR_BUFFER_BIT); // Do not clear the z-buffer, we care if bunny is in front of lightning
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Do not clear the z-buffer, we care if bunny is in front of lightning
 
 	glUseProgram(litshader);
 
