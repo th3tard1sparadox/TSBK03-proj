@@ -418,104 +418,104 @@ void display(void)
 
 	if(SSAO) {
 		// ---------- calc depth fbo
-		useFBO(fbo3, 0L, 0L);
+	 	useFBO(fbo3, 0L, 0L);
 
-		// Clear framebuffer & zbuffer
-		glClearColor(0.1, 0.1, 0.3, 0);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		
-		glUseProgram(depthshader);
-		
-		vm2 = viewMatrix * modelToWorldMatrix;
-		vm2 = vm2 * T(0, -8.5, 0);
-		vm2 = vm2 * S(80,80,80);
+	 	// Clear framebuffer & zbuffer
+	 	glClearColor(0.0, 0.0, 0.0, 1.0);
+	 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	 	
+	 	glUseProgram(depthshader);
+	 	
+	 	vm2 = viewMatrix * modelToWorldMatrix;
+	 	vm2 = vm2 * T(0, -8.5, 0);
+	 	vm2 = vm2 * S(80,80,80);
 
-		glUniformMatrix4fv(glGetUniformLocation(depthshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
-		glUniformMatrix4fv(glGetUniformLocation(depthshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
+	 	glUniformMatrix4fv(glGetUniformLocation(depthshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
+	 	glUniformMatrix4fv(glGetUniformLocation(depthshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
 
-		// Enable Z-buffering
-		glEnable(GL_DEPTH_TEST);
-		// Enable backface culling
-		glEnable(GL_CULL_FACE);
-		glCullFace(GL_BACK);
-
-
-		DrawModel(floor_Model, depthshader, "in_Position", NULL, NULL);
-
-		vm2 = viewMatrix * modelToWorldMatrix;
-		vm2 = vm2 * T(0, -8.5, 0);
-		vm2 = vm2 * T(20.0, -35.0, 5.0);
-		vm2 = vm2 * S(80,80,80);
-		glUniformMatrix4fv(glGetUniformLocation(depthshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
-		DrawModel(model1, depthshader, "in_Position", NULL, NULL);
-
-		// ---------- calc normal fbo
-		useFBO(fbo1, 0L, 0L);
-
-		// Clear framebuffer & zbuffer
-		glClearColor(0.1, 0.1, 0.3, 0);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		
-		glUseProgram(normalshader);
-		
-		vm2 = viewMatrix * modelToWorldMatrix;
-		vm2 = vm2 * T(0, -8.5, 0);
-		vm2 = vm2 * S(80,80,80);
-
-		glUniformMatrix4fv(glGetUniformLocation(normalshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
-		glUniformMatrix4fv(glGetUniformLocation(normalshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
-
-		// Enable Z-buffering
-		glEnable(GL_DEPTH_TEST);
-		// Enable backface culling
-		glEnable(GL_CULL_FACE);
-		glCullFace(GL_BACK);
+	 	// Enable Z-buffering
+	 	glEnable(GL_DEPTH_TEST);
+	 	// Enable backface culling
+	 	glEnable(GL_CULL_FACE);
+	 	glCullFace(GL_BACK);
 
 
-		DrawModel(floor_Model, normalshader, "in_Position", "in_Normal", NULL);
+	 	DrawModel(floor_Model, depthshader, "in_Position", NULL, NULL);
 
-		vm2 = viewMatrix * modelToWorldMatrix;
-		vm2 = vm2 * T(0, -8.5, 0);
-		vm2 = vm2 * T(20.0, -35.0, 5.0);
-		vm2 = vm2 * S(80,80,80);
-		glUniformMatrix4fv(glGetUniformLocation(normalshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
-		DrawModel(model1, normalshader, "in_Position", "in_Normal", NULL);
+	 	vm2 = viewMatrix * modelToWorldMatrix;
+	 	vm2 = vm2 * T(0, -8.5, 0);
+	 	vm2 = vm2 * T(20.0, -35.0, 5.0);
+	 	vm2 = vm2 * S(80,80,80);
+	 	glUniformMatrix4fv(glGetUniformLocation(depthshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
+	 	DrawModel(model1, depthshader, "in_Position", NULL, NULL);
 
-		// ---------- create ssao
-		useFBO(fbo2, fbo3, fbo1);
+	 	// ---------- calc normal fbo
+	 	useFBO(fbo1, 0L, 0L);
 
-		// Clear framebuffer & zbuffer
-		glClearColor(0.1, 0.1, 0.3, 0);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		
-		glUseProgram(ssaoshader);
-		
-		glUniform3fv(glGetUniformLocation(ssaoshader, "samples"), 200 * 3, (GLfloat *)samples);
+	 	// Clear framebuffer & zbuffer
+	 	glClearColor(0.0, 0.0, 0.0, 1.0);
+	 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	 	
+	 	glUseProgram(normalshader);
+	 	
+	 	vm2 = viewMatrix * modelToWorldMatrix;
+	 	vm2 = vm2 * T(0, -8.5, 0);
+	 	vm2 = vm2 * S(80,80,80);
 
-		glUniformMatrix4fv(glGetUniformLocation(ssaoshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
-		glUniformMatrix4fv(glGetUniformLocation(ssaoshader, "viewMatrix"), 1, GL_TRUE, viewMatrix.m);
+	 	glUniformMatrix4fv(glGetUniformLocation(normalshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
+	 	glUniformMatrix4fv(glGetUniformLocation(normalshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
 
-		glUniform1i(glGetUniformLocation(ssaoshader, "texUnit"), 0);
-		glUniform1i(glGetUniformLocation(ssaoshader, "texUnit2"), 1);
-		glUniform1i(glGetUniformLocation(ssaoshader, "texUnit3"), noiseTexture);
-		
-		glDisable(GL_CULL_FACE);
-		glDisable(GL_DEPTH_TEST);
-		DrawModel(squareModel, ssaoshader, "in_Position", NULL, "in_TexCoord");
-		
-		// ---------- blur shading
-		count = 5;
-		for (int i = 0; i < count; i++) {
-			runfilter(lowpassshader, fbo2, 0L, fbo1);
-			runfilter(lowpassshader, fbo1, 0L, fbo2);
-		}
+	 	// Enable Z-buffering
+	 	glEnable(GL_DEPTH_TEST);
+	 	// Enable backface culling
+	 	glEnable(GL_CULL_FACE);
+	 	glCullFace(GL_BACK);
+
+
+	 	DrawModel(floor_Model, normalshader, "in_Position", "in_Normal", NULL);
+
+	 	vm2 = viewMatrix * modelToWorldMatrix;
+	 	vm2 = vm2 * T(0, -8.5, 0);
+	 	vm2 = vm2 * T(20.0, -35.0, 5.0);
+	 	vm2 = vm2 * S(80,80,80);
+	 	glUniformMatrix4fv(glGetUniformLocation(normalshader, "modelviewMatrix"), 1, GL_TRUE, vm2.m);
+	 	DrawModel(model1, normalshader, "in_Position", "in_Normal", NULL);
+
+	 	// ---------- create ssao
+	 	useFBO(fbo2, fbo3, fbo1);
+
+	 	// Clear framebuffer & zbuffer
+	 	glClearColor(0.0, 0.0, 0.0, 1.0);
+	 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	 	
+	 	glUseProgram(ssaoshader);
+	 	
+	 	glUniform3fv(glGetUniformLocation(ssaoshader, "samples"), 200 * 3, (GLfloat *)samples);
+
+	 	glUniformMatrix4fv(glGetUniformLocation(ssaoshader, "projectionMatrix"), 1, GL_TRUE, projectionMatrix.m);
+	 	glUniformMatrix4fv(glGetUniformLocation(ssaoshader, "viewMatrix"), 1, GL_TRUE, viewMatrix.m);
+
+	 	glUniform1i(glGetUniformLocation(ssaoshader, "texUnit"), 0);
+	 	glUniform1i(glGetUniformLocation(ssaoshader, "texUnit2"), 1);
+	 	glUniform1i(glGetUniformLocation(ssaoshader, "texUnit3"), noiseTexture);
+	 	
+	 	glDisable(GL_CULL_FACE);
+	 	glDisable(GL_DEPTH_TEST);
+	 	DrawModel(squareModel, ssaoshader, "in_Position", NULL, "in_TexCoord");
+	 	
+	 	// ---------- blur shading
+	 	count = 5;
+	 	for (int i = 0; i < count; i++) {
+	 		runfilter(lowpassshader, fbo2, 0L, fbo1);
+	 		runfilter(lowpassshader, fbo1, 0L, fbo2);
+	 	}
 	}
 
 	// ---------- calc light
-	useFBO(fbo3, 0L, 0L);
+	useFBO(fbo1, 0L, 0L);
 
 	// Clear framebuffer & zbuffer
-	glClearColor(0.1, 0.1, 0.3, 0);
+	glClearColor(0.0, 0.0, 0.0, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
 	// Activate shader program
@@ -560,8 +560,8 @@ void display(void)
 	
 	if(SSAO) {
 		// ---------- add shading and light together
-		useFBO(fbo1, fbo2, fbo3);
-		glClearColor(0.0, 0.0, 0.0, 0.0);
+		useFBO(fbo3, fbo2, fbo1);
+		glClearColor(0.0, 0.0, 0.0, 1.0);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		glUseProgram(multfiltershader);
@@ -573,8 +573,8 @@ void display(void)
 		glDisable(GL_DEPTH_TEST);
 		DrawModel(squareModel, multfiltershader, "in_Position", NULL, "in_TexCoord");
 	} else {
-		useFBO(fbo1, fbo3, 0L);
-		glClearColor(0.0, 0.0, 0.0, 0.0);
+		useFBO(fbo3, fbo1, 0L);
+		glClearColor(0.0, 0.0, 0.0, 1.0);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		glUseProgram(plaintextureshader);
@@ -588,9 +588,11 @@ void display(void)
 
 
 	// ---------- lightning bolt
-	useFBO(fbo3, 0L, 0L);
-	glClearColor(0.0, 0.0, 0.0, 0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Do not clear the z-buffer, we care if bunny is in front of lightning
+	useFBO(fbo1, 0L, 0L);
+	glFlush();
+	// useFBO(0L, 0L, 0L);
+	glClearColor(0.0, 0.0, 0.0, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT); // Do not clear the z-buffer, we care if bunny is in front of lightning
 
 	glUseProgram(litshader);
 
@@ -609,7 +611,7 @@ void display(void)
 	
 	// ---------- add lighting bolt to scene
 	useFBO(fbo2, fbo3, fbo1);
-	glClearColor(0.0, 0.0, 0.0, 0.0);
+	glClearColor(0.0, 0.0, 0.0, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glUseProgram(addfiltershader);
@@ -622,18 +624,20 @@ void display(void)
 	DrawModel(squareModel, addfiltershader, "in_Position", NULL, "in_TexCoord");
 
 	// ---------- blur bolt
-	runfilter(truncateshader, fbo3, 0L, fbo1);
+	// runfilter(truncateshader, fbo1, 0L, fbo2);
+	runfilter(lowpassshader, fbo1, 0L, fbo3);
 
 	count = 100;
 	for (int i = 0; i < count; i++) {
 		runfilter(lowpassshader, fbo3, 0L, fbo1);
-	 	runfilter(lowpassshader, fbo1, 0L, fbo3);
+		runfilter(lowpassshader, fbo1, 0L, fbo3);
 	}
 
 	// ---------- add lighting bolt blur to scene
-	useFBO(0L, fbo2, fbo3);
-	glClearColor(0.0, 0.0, 0.0, 0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	useFBO(0L, fbo3, fbo2);
+	// useFBO(fbo1, fbo2, fbo3);
+	glClearColor(0.0, 0.0, 0.0, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
 	glUseProgram(addfiltershader);
 
